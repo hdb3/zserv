@@ -7,6 +7,8 @@ import Data.Attoparsec.Binary -- from package attoparsec-binary
 import Control.Applicative
 import Control.Monad(when,unless,liftM)
 import Control.Exception
+import Data.IP
+
 import ZMsg
 import ZSpec
 
@@ -86,7 +88,9 @@ zPrefixIPv4Parser :: Int -> Parser ZPrefix
 zPrefixIPv4Parser n = do
 
     word8 0x02 -- AF_INET
-    prefix <- anyWord32be
+    prefix' <- anyWord32le
+    -- why this is anyWord32le not anyWord32be i have no idea...
+    let prefix = fromHostAddress prefix'
     plen <- anyWord8
     return ZPrefix{..}
 {- NOTE - there are alternative forms for prefix i.e.:

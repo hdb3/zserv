@@ -1,6 +1,7 @@
 module ZMsg where
 import Data.ByteString
 import Data.Word
+import Data.IP
 
 data ZMsg = ZHello
             | ZInterfaceAdd ZInterface
@@ -26,6 +27,6 @@ data ZInterface = ZInterface { ifname :: ByteString
                              } deriving (Eq,Show,Read)
 
 
-data ZPrefix = ZPrefix { prefix :: Word32
+data ZPrefix = ZPrefix { prefix :: IPv4
                        , plen :: Word8
                        } deriving (Eq,Show,Read)
