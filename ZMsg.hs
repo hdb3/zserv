@@ -5,7 +5,7 @@ import Data.Word
 data ZMsg = ZHello
             | ZInterfaceAdd ZInterface
             | ZInterfaceAddressAdd { payload :: ByteString }
-            | ZRouterIDUpdate { payload :: ByteString }
+            | ZRouterIDUpdate ZPrefix
             | ZIPV4RouteDelete { payload :: ByteString }
             | ZNexthopUnregister { payload :: ByteString }
             | ZUnknown { cmd :: Word16 , payload :: ByteString }
@@ -24,3 +24,8 @@ data ZInterface = ZInterface { ifname :: ByteString
                              -- there is a placeholder here for 'link params'
                              -- which is for TE - but it is really longwinded so won't bother doing it now
                              } deriving (Eq,Show,Read)
+
+
+data ZPrefix = ZPrefix { prefix :: Word32
+                       , plen :: Word8
+                       } deriving (Eq,Show,Read)

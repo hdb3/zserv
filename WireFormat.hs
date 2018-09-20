@@ -43,8 +43,10 @@ zParser n = do
              return $ ZInterfaceAddressAdd pl
 
       | cmd == _ZEBRA_ROUTER_ID_UPDATE ->
-          do pl <- DAB.take (n-2)
-             return $ ZRouterIDUpdate pl
+          -- do pl <- DAB.take (n-2)
+             -- return $ ZRouterIDUpdate pl
+              do prefix <- zPrefixIPv4Parser (n-2)
+                 return $ ZRouterIDUpdate prefix
 
       | cmd == _ZEBRA_IPV4_ROUTE_DELETE ->
           do pl <- DAB.take (n-2)
@@ -79,3 +81,17 @@ zInterfaceParser n = do
     word8 0x00
     return $ --assert (n == 58 + fromIntegral hardwareAddressLength)
              ZInterface {..} 
+
+zPrefixIPv4Parser :: Int -> Parser ZPrefix
+zPrefixIPv4Parser n = do
+
+    word8 0x02 -- AF_INET
+    prefix <- anyWord32be
+    plen <- anyWord8
+    return ZPrefix{..}
+{- NOTE - there are alternative forms for prefix i.e.:
+
+AF_INET =2 - size 4
+AF_INET6 = 10 size 16
+AF_ETHERNET = AF_PACKET = 17 size 6
+-}
