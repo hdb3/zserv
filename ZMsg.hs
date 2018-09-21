@@ -4,7 +4,7 @@ import Data.ByteString
 import Data.Word
 import Data.IP
 
-data ZMsg = ZHello
+data ZMsg = ZHello Word8
             | ZInterfaceAdd ZInterface
             | ZInterfaceAddressAdd ZInterfaceAddress
             | ZRouterIDUpdate ZPrefix

@@ -56,14 +56,16 @@ zMessageParser' = do
 
 
 zParser :: Int -> Parser ZMsg
-zParser n = do
+zParser n' = do
+   let n = n'-2
    cmd' <- anyWord16be
    let cmd = cmd'
    --let cmd = assert (cmd `elem` zKnownCommands) cmd'
-   if | cmd == _ZEBRA_HELLO -> return ZHello
+   if | cmd == _ZEBRA_HELLO && n == 1 -> do protocol <- anyWord8
+                                            return $ ZHello protocol
 
       | cmd == _ZEBRA_INTERFACE_ADD ->
-          do interface <- zInterfaceParser (n-2)
+          do interface <- zInterfaceParser n
              return $ ZInterfaceAdd interface
 
       | cmd == _ZEBRA_INTERFACE_ADDRESS_ADD ->
@@ -71,23 +73,23 @@ zParser n = do
              return $ ZInterfaceAddressAdd zia
 
       | cmd == _ZEBRA_ROUTER_ID_UPDATE ->
-              do prefix <- zPrefixIPv4Parser (n-2)
+              do prefix <- zPrefixIPv4Parser n
                  return $ ZRouterIDUpdate prefix
 
       | cmd == _ZEBRA_IPV4_ROUTE_DELETE ->
-          do route <- zRouteParser (n-2)
+          do route <- zRouteParser n
              return $ ZIPV4RouteDelete route
 
       | cmd == _ZEBRA_NEXTHOP_UNREGISTER ->
-          do up <- zNextHopUpdateParser -- (n-2)
+          do up <- zNextHopUpdateParser -- n
              return $ ZNexthopUnregister up
 
       | cmd == _ZEBRA_NEXTHOP_UPDATE ->
-          do route <- zRouteParser (n-2)
+          do route <- zRouteParser n
              return $ ZNexthopUpdate route
 
       | otherwise -> do
-            payload <- DAB.take (n-2)
+            payload <- DAB.take n
             return $ ZUnknown cmd payload
 
 zNextHopParser :: Parser ZNextHop
