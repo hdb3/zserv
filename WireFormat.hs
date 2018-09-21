@@ -5,8 +5,8 @@ import Data.Attoparsec.ByteString -- from package attoparsec
 import qualified Data.Attoparsec.ByteString as DAB
 import Data.Attoparsec.Binary -- from package attoparsec-binary
 import Control.Applicative
-import Control.Monad(when,unless,liftM)
-import Control.Exception
+import Control.Monad(when)
+--import Control.Exception only if assert is used...
 import Data.IP
 import Data.Bits
 import Data.Word
@@ -14,10 +14,26 @@ import Data.Word
 import ZMsg
 import ZSpec
 
-type RawZMessage = BS.ByteString
+-- type RawZMessage = BS.ByteString
 
 zFlowParser :: Parser [ZMsg]
 zFlowParser = many1 zMessageParser'
+
+
+zRawFlowParser :: Parser [(Word16,BS.ByteString)]
+zRawFlowParser = many1 zRawMessageParser
+zRawMessageParser :: Parser (Word16,BS.ByteString)
+zRawMessageParser = do
+    msgLen <- anyWord16be
+    word8 0xff
+    word8 0x03
+    word16be 0x0000
+    when (msgLen > 4096 || msgLen < 8) ( fail "invalid message length")
+    cmd <- anyWord16be
+    pl <- DAB.take (fromIntegral msgLen - 8)
+    return (cmd,pl)
+
+
 
 zMessageParser :: Parser (Maybe ZMsg)
 zMessageParser = ( zMessageParser'' <|> return Nothing ) <?> "zserv wire format parser"
@@ -140,23 +156,19 @@ zInterfaceParser n = do
     return $ --assert (n == 58 + fromIntegral hardwareAddressLength)
              ZInterface {..} 
 
--- readPrefix1Byte :: Parser IPv4
 readPrefix1Byte = do
     b0 <- anyWord8
     return (unsafeShiftL (fromIntegral b0) 24)
 
---readPrefix2Byte :: Parser IPv4
 readPrefix2Byte = do
     b0 <- anyWord16be
     return (unsafeShiftL (fromIntegral b0) 16)
 
---readPrefix3Byte :: Parser IPv4
 readPrefix3Byte = do
     b0 <- anyWord16be
     b1 <- anyWord16be
-    return (fromIntegral b1 .|. (unsafeShiftL (fromIntegral b0) 16))
+    return (fromIntegral b1 .|. unsafeShiftL (fromIntegral b0) 16)
 
---readPrefix4Byte :: Parser IPv4
 readPrefix4Byte = anyWord32be
 
 zvPrefixIPv4Parser :: Parser ZPrefix
@@ -174,7 +186,7 @@ zvPrefixIPv4Parser = do
 zPrefixIPv4Parser :: Int -> Parser ZPrefix
 zPrefixIPv4Parser n = do
 
-    word8 0x02 -- AF_INET
+    word8 _AF_INET
     prefix' <- anyWord32le
     -- why this is anyWord32le not anyWord32be i have no idea...
     let prefix = fromHostAddress prefix'
