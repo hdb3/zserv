@@ -6,11 +6,14 @@ import Data.IP
 
 data ZMsg = ZHello Word8
             | ZInterfaceAdd ZInterface
+            | ZQInterfaceAdd
             | ZInterfaceAddressAdd ZInterfaceAddress
             | ZRouterIDUpdate ZPrefix
             | ZIPV4RouteDelete ZRoute
+            | ZIPV4RouteAdd ZRoute
             | ZNexthopUpdate ZRoute
             | ZNexthopUnregister ZNextHopUpdate
+            | ZRouterIdAdd
             | ZUnknown { cmd :: Word16 , payload :: ByteString }
     deriving (Eq,Show,Read)
 

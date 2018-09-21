@@ -65,8 +65,9 @@ zParser n' = do
                                             return $ ZHello protocol
 
       | cmd == _ZEBRA_INTERFACE_ADD ->
-          do interface <- zInterfaceParser n
-             return $ ZInterfaceAdd interface
+          if n == 0 then return ZQInterfaceAdd
+          else do interface <- zInterfaceParser n
+                  return $ ZInterfaceAdd interface
 
       | cmd == _ZEBRA_INTERFACE_ADDRESS_ADD ->
           do zia <- zInterfaceAddressParser
@@ -75,6 +76,10 @@ zParser n' = do
       | cmd == _ZEBRA_ROUTER_ID_UPDATE ->
               do prefix <- zPrefixIPv4Parser n
                  return $ ZRouterIDUpdate prefix
+
+      | cmd == _ZEBRA_IPV4_ROUTE_ADD ->
+          do route <- zRouteParser n
+             return $ ZIPV4RouteAdd route
 
       | cmd == _ZEBRA_IPV4_ROUTE_DELETE ->
           do route <- zRouteParser n
@@ -87,6 +92,8 @@ zParser n' = do
       | cmd == _ZEBRA_NEXTHOP_UPDATE ->
           do route <- zRouteParser n
              return $ ZNexthopUpdate route
+
+      | cmd == _ZEBRA_ROUTER_ID_ADD  && n == 0 -> return ZRouterIdAdd -- I suspect that the zero length version is a query...
 
       | otherwise -> do
             payload <- DAB.take n

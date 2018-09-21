@@ -28,7 +28,7 @@ main = do
     --print $ parse' zParser "00080909080001100b0500000000"
     --print $ parse' zParser "00080909080001180c000200000000"
     --print $ parse' zParser "00080909080001180c000100000000"
-    parseFlowFile "flow3"
+    parseFlowFile "flow4"
     --parseFlowFile "flow2"
     -- parseFlowFile "flow3"
     -- parseFlowFile "flow4"
@@ -41,7 +41,7 @@ parseFlowFile path = do
     -- let zmsgs = parseOnly (zFlowParser <* endOfInput) flow
     putStrLn $ "\nraw  " ++ path
     either putStrLn
-           ( mapM_ ( \(cmd,pl) -> putStrLn $ "cmd " ++ show cmd ++ " len " ++ show (BS.length pl) ++ " : " ++ (toHex pl) ))
+           ( mapM_ ( \(cmd,pl) -> putStrLn $ "cmd " ++ show cmd ++ " len " ++ show (BS.length pl-2) ++ " : " ++ (toHex pl) ))
            raw
 {-
     let parsed = either Left  (Right . map eparse) raw
