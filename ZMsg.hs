@@ -9,6 +9,7 @@ data ZMsg = ZHello
             | ZInterfaceAddressAdd ZInterfaceAddress
             | ZRouterIDUpdate ZPrefix
             | ZIPV4RouteDelete ZRoute
+            | ZNexthopUpdate ZRoute
             | ZNexthopUnregister { payload :: ByteString }
             | ZUnknown { cmd :: Word16 , payload :: ByteString }
     deriving (Eq,Show,Read)

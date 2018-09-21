@@ -6,15 +6,13 @@ import qualified Data.Attoparsec.ByteString as DAB
 import Data.Attoparsec.Binary -- from package attoparsec-binary
 import Control.Applicative
 import Control.Monad(when)
---import Control.Exception only if assert is used...
+import Control.Exception -- only if assert is used...
 import Data.IP
 import Data.Bits
 import Data.Word
 
 import ZMsg
 import ZSpec
-
--- type RawZMessage = BS.ByteString
 
 zFlowParser :: Parser [ZMsg]
 zFlowParser = many1 zMessageParser'
@@ -29,9 +27,14 @@ zRawMessageParser = do
     word8 0x03
     word16be 0x0000
     when (msgLen > 4096 || msgLen < 8) ( fail "invalid message length")
-    cmd <- anyWord16be
+    -- cmd <- anyWord16be
+    -- pl <- DAB.take (fromIntegral msgLen - 8)
+    -- return (cmd,pl)
+
+    -- this version replaces the command word in the bytestring to allow another parser to be run over it
+    (cmdBS,cmd) <- match anyWord16be
     pl <- DAB.take (fromIntegral msgLen - 8)
-    return (cmd,pl)
+    return (cmd,BS.append cmdBS pl)
 
 
 
@@ -54,7 +57,9 @@ zMessageParser' = do
 
 zParser :: Int -> Parser ZMsg
 zParser n = do
-   cmd <- anyWord16be
+   cmd' <- anyWord16be
+   let cmd = cmd'
+   --let cmd = assert (cmd `elem` zKnownCommands) cmd'
    if | cmd == _ZEBRA_HELLO -> return ZHello
 
       | cmd == _ZEBRA_INTERFACE_ADD ->
@@ -76,6 +81,10 @@ zParser n = do
       | cmd == _ZEBRA_NEXTHOP_UNREGISTER ->
           do pl <- DAB.take (n-2)
              return $ ZNexthopUnregister pl
+
+      | cmd == _ZEBRA_NEXTHOP_UPDATE ->
+          do route <- zRouteParser (n-2)
+             return $ ZNexthopUpdate route
 
       | otherwise -> do
             payload <- DAB.take (n-2)
@@ -166,7 +175,7 @@ readPrefix2Byte = do
 
 readPrefix3Byte = do
     b0 <- anyWord16be
-    b1 <- anyWord16be
+    b1 <- anyWord8
     return (fromIntegral b1 .|. unsafeShiftL (fromIntegral b0) 16)
 
 readPrefix4Byte = anyWord32be
