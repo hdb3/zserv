@@ -16,6 +16,9 @@ import ZSpec
 
 type RawZMessage = BS.ByteString
 
+zFlowParser :: Parser [ZMsg]
+zFlowParser = many1 zMessageParser'
+
 zMessageParser :: Parser (Maybe ZMsg)
 zMessageParser = ( zMessageParser'' <|> return Nothing ) <?> "zserv wire format parser"
 zMessageParser'' = do

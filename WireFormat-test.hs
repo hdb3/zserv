@@ -29,4 +29,17 @@ zPrefixIPv4Parser :: Int -> Parser ZPrefix
 parse' p s = parse (p n) bs where
     bs = fromHex s
     n  = BS.length bs
-main = print $ parse' zRouteParser "0909080001080a00000000"
+main = do
+    -- print $ parse' zRouteParser "0909080001080a00000000"
+    parseFlowFile "flow1"
+    parseFlowFile "flow2"
+    parseFlowFile "flow3"
+
+parseFlowFile path = do
+    flow <- BS.readFile path
+    let zmsgs = parseOnly zFlowParser flow
+    -- let zmsgs = parseOnly (zFlowParser <* endOfInput) flow
+    putStrLn $ "\n" ++ path
+    putStrLn $ either show
+                      ( unlines . map show )
+                      zmsgs
