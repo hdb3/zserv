@@ -79,8 +79,8 @@ zParser n = do
              return $ ZIPV4RouteDelete route
 
       | cmd == _ZEBRA_NEXTHOP_UNREGISTER ->
-          do pl <- DAB.take (n-2)
-             return $ ZNexthopUnregister pl
+          do up <- zNextHopUpdateParser -- (n-2)
+             return $ ZNexthopUnregister up
 
       | cmd == _ZEBRA_NEXTHOP_UPDATE ->
           do route <- zRouteParser (n-2)
@@ -101,6 +101,21 @@ zNextHopParser = do
              w32 <- anyWord32be
              return $ ZNHBIfindex w32
 
+zNextHopUpdateParser :: Parser ZNextHopUpdate
+zNextHopUpdateParser = do
+    flags <- anyWord8
+    afi16  <- anyWord16be
+    let afi = fromIntegral afi16 -- yes - in thi smmessage the AFI is 16bits!!
+                                 -- and, also, the prefix is not compressed....
+    plen <- anyWord8
+    if | afi == _AF_INET  -> do v4address <- zIPv4
+                                return ZNextHopVUpdate4{..}
+       | afi == _AF_INET6 -> do v6address <- zIPv6
+                                return ZNextHopVUpdate6{..}
+
+--data ZNextHopUpdate = ZNextHopVUpdate4 {flags :: Word8 ,  plen :: Word8, v4address :: IPv4 } |
+--                      ZNextHopVUpdate6 {flags :: Word8 ,  plen :: Word8, v6address :: IPv6 } deriving (Eq,Show,Read)
+
 
 zInterfaceAddressParser :: Parser ZInterfaceAddress
 zInterfaceAddressParser = do
@@ -111,22 +126,40 @@ zInterfaceAddressParser = do
        | afi == _AF_INET6 -> zInterfaceAddressParserV6 ifindex flags
 
 zInterfaceAddressParserV4 ifindex flags = do
-    addressA' <- anyWord32le
-    let addressA = fromHostAddress addressA'
+    --addressA' <- anyWord32le
+    --let addressA = fromHostAddress addressA'
+    addressA <- zIPv4
     plen <- anyWord8
-    addressB' <- anyWord32le
-    let addressB = fromHostAddress addressB'
+    addressB <- zIPv4
+    --addressB' <- anyWord32le
+    --let addressB = fromHostAddress addressB'
     return ZInterfaceAddressV4{..}
 
 zInterfaceAddressParserV6 ifindex flags = do
-    v6addressA' <- DAB.take 16
-    let v6addressA = bsToIPv6 v6addressA'
+    --v6addressA' <- DAB.take 16
+    --let v6addressA = bsToIPv6 v6addressA'
+    v6addressA <- zIPv6
     plen <- anyWord8
-    v6addressB' <- DAB.take 16
-    let v6addressB = bsToIPv6 v6addressB'
+    v6addressB <- zIPv6
+    --v6addressB' <- DAB.take 16
+    --let v6addressB = bsToIPv6 v6addressB'
     return ZInterfaceAddressV6{..}
-    where
-    bsToIPv6 = toIPv6b . map fromIntegral . BS.unpack
+    -- where
+    -- bsToIPv6 = toIPv6b . map fromIntegral . BS.unpack
+
+zIPv4 = zIPv4Parser
+zIPv4Parser :: Parser IPv4
+zIPv4Parser = do
+    v4address <- anyWord32le
+    return $ fromHostAddress v4address
+
+zIPv6 = zIPv6Parser
+zIPv6Parser :: Parser IPv6
+zIPv6Parser = do
+    v6address <- DAB.take 16
+    return $ (toIPv6b . map fromIntegral . BS.unpack) v6address
+
+
 
 zRouteParser :: Int -> Parser ZRoute
 zRouteParser n = do

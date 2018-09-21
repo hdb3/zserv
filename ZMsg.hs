@@ -10,7 +10,7 @@ data ZMsg = ZHello
             | ZRouterIDUpdate ZPrefix
             | ZIPV4RouteDelete ZRoute
             | ZNexthopUpdate ZRoute
-            | ZNexthopUnregister { payload :: ByteString }
+            | ZNexthopUnregister ZNextHopUpdate
             | ZUnknown { cmd :: Word16 , payload :: ByteString }
     deriving (Eq,Show,Read)
 
@@ -45,6 +45,9 @@ data ZInterface = ZInterface { ifname :: ByteString
 data ZPrefix = ZPrefix { prefix :: IPv4
                        , plen :: Word8
                        } deriving (Eq,Show,Read)
+
+data ZNextHopUpdate = ZNextHopVUpdate4 {flags :: Word8 ,  plen :: Word8, v4address :: IPv4 } |
+                      ZNextHopVUpdate6 {flags :: Word8 ,  plen :: Word8, v6address :: IPv6 } deriving (Eq,Show,Read)
 
 data ZNextHop = ZNHBlackhole | ZNHIPv4 IPv4 | ZNHBIfindex Word32  deriving (Eq,Show,Read)
 
