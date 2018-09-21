@@ -43,16 +43,14 @@ zParser n = do
              return $ ZInterfaceAdd interface
 
       | cmd == _ZEBRA_INTERFACE_ADDRESS_ADD ->
-          do pl <- DAB.take (n-2)
-             return $ ZInterfaceAddressAdd pl
+          do zia <- zInterfaceAddressParser
+             return $ ZInterfaceAddressAdd zia
 
       | cmd == _ZEBRA_ROUTER_ID_UPDATE ->
               do prefix <- zPrefixIPv4Parser (n-2)
                  return $ ZRouterIDUpdate prefix
 
       | cmd == _ZEBRA_IPV4_ROUTE_DELETE ->
-          --do pl <- DAB.take (n-2)
-             --return $ ZIPV4RouteDelete pl
           do route <- zRouteParser (n-2)
              return $ ZIPV4RouteDelete route
 
@@ -74,6 +72,33 @@ zNextHopParser = do
        | nextHopType == _ZEBRA_NEXTHOP_IFINDEX -> do
              w32 <- anyWord32be
              return $ ZNHBIfindex w32
+
+
+zInterfaceAddressParser :: Parser ZInterfaceAddress
+zInterfaceAddressParser = do
+    ifindex <- anyWord32be
+    flags <- anyWord8
+    afi  <- anyWord8
+    if | afi == _AF_INET  -> zInterfaceAddressParserV4 ifindex flags
+       | afi == _AF_INET6 -> zInterfaceAddressParserV6 ifindex flags
+
+zInterfaceAddressParserV4 ifindex flags = do
+    addressA' <- anyWord32le
+    let addressA = fromHostAddress addressA'
+    plen <- anyWord8
+    addressB' <- anyWord32le
+    let addressB = fromHostAddress addressB'
+    return ZInterfaceAddressV4{..}
+
+zInterfaceAddressParserV6 ifindex flags = do
+    v6addressA' <- DAB.take 16
+    let v6addressA = bsToIPv6 v6addressA'
+    plen <- anyWord8
+    v6addressB' <- DAB.take 16
+    let v6addressB = bsToIPv6 v6addressB'
+    return ZInterfaceAddressV6{..}
+    where
+    bsToIPv6 = toIPv6b . map fromIntegral . BS.unpack
 
 zRouteParser :: Int -> Parser ZRoute
 zRouteParser n = do

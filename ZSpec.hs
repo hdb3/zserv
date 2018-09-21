@@ -2,6 +2,9 @@ module ZSpec where
 import Data.Word
 default(Int)
 
+_AF_INET6 = 10 :: Word8
+_AF_INET  =  2 :: Word8
+
 _ZEBRA_INTERFACE_ADD = 1 :: Word16
 _ZEBRA_INTERFACE_DELETE = 2 :: Word16
 _ZEBRA_INTERFACE_ADDRESS_ADD = 3 :: Word16

@@ -1,3 +1,4 @@
+{-# LANGUAGE DuplicateRecordFields,RecordWildCards #-}
 module ZMsg where
 import Data.ByteString
 import Data.Word
@@ -5,12 +6,25 @@ import Data.IP
 
 data ZMsg = ZHello
             | ZInterfaceAdd ZInterface
-            | ZInterfaceAddressAdd { payload :: ByteString }
+            | ZInterfaceAddressAdd ZInterfaceAddress
             | ZRouterIDUpdate ZPrefix
             | ZIPV4RouteDelete ZRoute
             | ZNexthopUnregister { payload :: ByteString }
             | ZUnknown { cmd :: Word16 , payload :: ByteString }
     deriving (Eq,Show,Read)
+
+data ZInterfaceAddress = ZInterfaceAddressV4 { ifindex :: Word32
+                                             , flags :: Word8
+                                             , addressA :: IPv4
+                                             , plen :: Word8
+                                             , addressB :: IPv4
+                                             }  |
+                         ZInterfaceAddressV6 { ifindex :: Word32
+                                             , flags :: Word8
+                                             , v6addressA :: IPv6
+                                             , plen :: Word8
+                                             , v6addressB :: IPv6
+                                             } deriving (Eq,Show,Read)
 
 data ZInterface = ZInterface { ifname :: ByteString
                              , ifindex :: Word32
