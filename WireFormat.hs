@@ -62,68 +62,143 @@ zParser n' = do
    let cmd = cmd'
    --let cmd = assert (cmd `elem` zKnownCommands) cmd'
    if | cmd == _ZEBRA_HELLO && n == 1 -> do protocol <- anyWord8
-                                            return $ ZHello protocol
+                                            return $ ZMHello protocol
 
       | cmd == _ZEBRA_INTERFACE_ADD ->
-          if n == 0 then return ZQInterfaceAdd
+          if n == 0 then return ZMQInterfaceAdd
           else do interface <- zInterfaceParser n
-                  return $ ZInterfaceAdd interface
+                  return $ ZMInterfaceAdd interface
 
       | cmd == _ZEBRA_INTERFACE_ADDRESS_ADD ->
           do zia <- zInterfaceAddressParser
-             return $ ZInterfaceAddressAdd zia
+             return $ ZMInterfaceAddressAdd zia
 
       | cmd == _ZEBRA_ROUTER_ID_UPDATE ->
               do prefix <- zPrefixIPv4Parser n
-                 return $ ZRouterIDUpdate prefix
+                 return $ ZMRouterIDUpdate prefix
 
       | cmd == _ZEBRA_IPV4_ROUTE_ADD ->
           do route <- zRouteParser n
-             return $ ZIPV4RouteAdd route
+             return $ ZMIPV4RouteAdd route
 
       | cmd == _ZEBRA_IPV4_ROUTE_DELETE ->
           do route <- zRouteParser n
-             return $ ZIPV4RouteDelete route
+             return $ ZMIPV4RouteDelete route
 
       | cmd == _ZEBRA_NEXTHOP_UNREGISTER ->
-          do up <- zNextHopUpdateParser -- n
-             return $ ZNexthopUnregister up
+          do up <- zNextHopUpdateParser True n
+             return $ ZMNextHopUnregister up
 
       | cmd == _ZEBRA_NEXTHOP_UPDATE ->
-          do route <- zRouteParser n
-             return $ ZNexthopUpdate route
+          do nh <- zNextHopUpdateParser False n
+             return $ ZMNextHopUpdate nh
 
-      | cmd == _ZEBRA_ROUTER_ID_ADD  && n == 0 -> return ZRouterIdAdd -- I suspect that the zero length version is a query...
+      | cmd == _ZEBRA_ROUTER_ID_ADD  && n == 0 -> return ZMRouterIdAdd -- I suspect that the zero length version is a query...
 
       | otherwise -> do
             payload <- DAB.take n
-            return $ ZUnknown cmd payload
+            return $ ZMUnknown cmd payload
 
+-- this function duplicates much of the larger function used elesewhere....  ;-)
+-- however this one used when the number of nextHops is known in advance....
 zNextHopParser :: Parser ZNextHop
 zNextHopParser = do
     nextHopType <- anyWord8
     if | nextHopType == _ZEBRA_NEXTHOP_BLACKHOLE -> return ZNHBlackhole
        | nextHopType == _ZEBRA_NEXTHOP_IPV4 -> do
-             w32 <- anyWord32be
-             return $ ZNHIPv4 (fromHostAddress w32)
+             ipv4 <- zIPv4
+             return $ ZNHIPv4 ipv4
        | nextHopType == _ZEBRA_NEXTHOP_IFINDEX -> do
              w32 <- anyWord32be
-             return $ ZNHBIfindex w32
+             return $ ZNHIfindex w32
+{-
+-}
+{-
+when there is no next hop then 5 bytes of zero are sent, otherwise,
+where a next hop is present the first field sent is a 4 byte metric followed by a 1 byte zero pad
+and then N x {  byte hoptype, followed by a variant field}
+there are a number of next hop types:
+for types 
+              ZEBRA_NEXTHOP_IPV4: 
+the value is an IPv4
+for
+              ZEBRA_NEXTHOP_IFINDEX:
+              ZEBRA_NEXTHOP_IFNAME:
+the value is a 4 byte ifindex
 
-zNextHopUpdateParser :: Parser ZNextHopUpdate
-zNextHopUpdateParser = do
-    flags <- anyWord8
+for these it is an 8 byte tuple of IPv4 and 4 byte ifindex
+              ZEBRA_NEXTHOP_IPV4_IFINDEX:
+              ZEBRA_NEXTHOP_IPV4_IFNAME:
+this taes 16 byte ipv6
+              case ZEBRA_NEXTHOP_IPV6:
+
+and these are 20 bytes - 16 byte ipv6 + 4 byte ifindex
+              case ZEBRA_NEXTHOP_IPV6_IFINDEX:
+              case ZEBRA_NEXTHOP_IPV6_IFNAME:
+
+in summarry after the prefix there are either 5x0 or 5x? followed by 1 or more variants of either 5, 9, 17 or 21
+
+5x0 is one terninating parser
+metric(4)+1 is a root parser for the others
+
+-}
+
+zNextHopUpdateParser :: Bool -> Int -> Parser ZNextHopUpdate
+zNextHopUpdateParser getFlags n = do
+    flags <- if getFlags then anyWord8 else return 0
+    let n' = if getFlags then n-1 else n
     afi16  <- anyWord16be
     let afi = fromIntegral afi16 -- yes - in thi smmessage the AFI is 16bits!!
                                  -- and, also, the prefix is not compressed....
     plen <- anyWord8
-    if | afi == _AF_INET  -> do v4address <- zIPv4
-                                return ZNextHopVUpdate4{..}
-       | afi == _AF_INET6 -> do v6address <- zIPv6
-                                return ZNextHopVUpdate6{..}
+    (prefix,n'') <- if | afi == _AF_INET  -> do v4address <- zIPv4
+                                                return (ZPrefixV4{..},n'-6)
+                       | afi == _AF_INET6 -> do v6address <- zIPv6
+                                                return (ZPrefixV6{..},n'-18)
+    (metric,nexthops) <- zStartUpdateParse n''
+    return ZNextHopUpdate{..}
 
---data ZNextHopUpdate = ZNextHopVUpdate4 {flags :: Word8 ,  plen :: Word8, v4address :: IPv4 } |
---                      ZNextHopVUpdate6 {flags :: Word8 ,  plen :: Word8, v6address :: IPv6 } deriving (Eq,Show,Read)
+zStartUpdateParse n | n == 0 = return (0,[])
+                    | n < 5  = return (0,[])
+                    | n > 4  = do
+    metric <- anyWord32be
+    nextHopCount <- anyWord8
+    nexthops <- count (fromIntegral nextHopCount) zNextHopParser
+{-
+    word8 0 -- zero pad in all cases
+    nexthops <- if 0 == metric then return []
+                else do nextHopCount <- anyWord8
+                        count (fromIntegral nextHopCount) zNextHopParser
+                -- else zGetNextUpdate (n-5,[])
+-}
+    return (metric,nexthops)
+    where
+    zGetNextUpdate (n,nexthops) =
+        do hopType <- anyWord8
+           if | hopType == _ZEBRA_NEXTHOP_IPV4 && n > 3 ->
+               do ipv4 <- zIPv4
+                  zGetNextUpdate (n-5, (ZNHIPv4 ipv4) : nexthops)
+
+              | (hopType == _ZEBRA_NEXTHOP_IFINDEX) || (hopType == _ZEBRA_NEXTHOP_IFNAME) && n > 3 ->
+               do ifindex <- anyWord32be
+                  zGetNextUpdate (n-5, (ZNHIfindex ifindex) : nexthops)
+
+              | (hopType == _ZEBRA_NEXTHOP_IPV4_IFINDEX) || (hopType == _ZEBRA_NEXTHOP_IPV4_IFNAME) && n > 7 ->
+               do ipv4 <- zIPv4
+                  ifindex <- anyWord32be
+                  zGetNextUpdate (n-5, (ZNHIPv4Ifindex ipv4 ifindex) : nexthops)
+
+              | (hopType == _ZEBRA_NEXTHOP_IPV6) && n > 15 ->
+               do ipv6 <-zIPv6
+                  zGetNextUpdate (n-5, (ZNHIPv6 ipv6) : nexthops)
+
+              | (hopType == _ZEBRA_NEXTHOP_IPV6_IFINDEX) || (hopType == _ZEBRA_NEXTHOP_IPV6_IFNAME) && n > 19 ->
+               do ipv6 <- zIPv6
+                  ifindex <- anyWord32be
+                  zGetNextUpdate (n-5, (ZNHIPv6Ifindex ipv6 ifindex) : nexthops)
+              | hopType == _ZEBRA_NEXTHOP_BLACKHOLE -> 
+                  zGetNextUpdate (n-1, ZNHBlackhole : nexthops)
+              | otherwise -> return nexthops
 
 
 zInterfaceAddressParser :: Parser ZInterfaceAddress
@@ -167,8 +242,6 @@ zIPv6Parser :: Parser IPv6
 zIPv6Parser = do
     v6address <- DAB.take 16
     return $ (toIPv6b . map fromIntegral . BS.unpack) v6address
-
-
 
 zRouteParser :: Int -> Parser ZRoute
 zRouteParser n = do
@@ -231,8 +304,8 @@ zvPrefixIPv4Parser = do
            | plen < 17  -> readPrefix2Byte 
            | plen < 25  -> readPrefix3Byte 
            | plen < 33  -> readPrefix4Byte 
-    let prefix = fromHostAddress $ byteSwap32 prefix'
-    return ZPrefix{..}
+    let v4address = fromHostAddress $ byteSwap32 prefix'
+    return ZPrefixV4{..}
 
 zPrefixIPv4Parser :: Int -> Parser ZPrefix
 zPrefixIPv4Parser n = do
@@ -240,9 +313,9 @@ zPrefixIPv4Parser n = do
     word8 _AF_INET
     prefix' <- anyWord32le
     -- why this is anyWord32le not anyWord32be i have no idea...
-    let prefix = fromHostAddress prefix'
+    let v4address = fromHostAddress prefix'
     plen <- anyWord8
-    return ZPrefix{..}
+    return ZPrefixV4{..}
 
 {- NOTE - there are alternative forms for prefix i.e.:
 

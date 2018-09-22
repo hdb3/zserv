@@ -1,20 +1,20 @@
-{-# LANGUAGE DuplicateRecordFields,RecordWildCards #-}
+{-# LANGUAGE DataKinds,DuplicateRecordFields,RecordWildCards #-}
 module ZMsg where
 import Data.ByteString
 import Data.Word
 import Data.IP
 
-data ZMsg = ZHello Word8
-            | ZInterfaceAdd ZInterface
-            | ZQInterfaceAdd
-            | ZInterfaceAddressAdd ZInterfaceAddress
-            | ZRouterIDUpdate ZPrefix
-            | ZIPV4RouteDelete ZRoute
-            | ZIPV4RouteAdd ZRoute
-            | ZNexthopUpdate ZRoute
-            | ZNexthopUnregister ZNextHopUpdate
-            | ZRouterIdAdd
-            | ZUnknown { cmd :: Word16 , payload :: ByteString }
+data ZMsg =   ZMHello Word8
+            | ZMInterfaceAdd ZInterface
+            | ZMQInterfaceAdd
+            | ZMInterfaceAddressAdd ZInterfaceAddress
+            | ZMRouterIDUpdate ZPrefix
+            | ZMIPV4RouteDelete ZRoute
+            | ZMIPV4RouteAdd ZRoute
+            | ZMNextHopUpdate ZNextHopUpdate
+            | ZMNextHopUnregister ZNextHopUpdate
+            | ZMRouterIdAdd
+            | ZMUnknown { cmd :: Word16 , payload :: ByteString }
     deriving (Eq,Show,Read)
 
 data ZInterfaceAddress = ZInterfaceAddressV4 { ifindex :: Word32
@@ -45,14 +45,18 @@ data ZInterface = ZInterface { ifname :: ByteString
                              } deriving (Eq,Show,Read)
 
 
-data ZPrefix = ZPrefix { prefix :: IPv4
-                       , plen :: Word8
-                       } deriving (Eq,Show,Read)
+data ZNextHopUpdate = ZNextHopUpdate {flags :: Word8 , metric :: Word32 ,  prefix :: ZPrefix , nexthops :: [ZNextHop] } deriving (Eq,Show,Read)
 
-data ZNextHopUpdate = ZNextHopVUpdate4 {flags :: Word8 ,  plen :: Word8, v4address :: IPv4 } |
-                      ZNextHopVUpdate6 {flags :: Word8 ,  plen :: Word8, v6address :: IPv6 } deriving (Eq,Show,Read)
+data ZPrefix = ZPrefixV4 { v4address :: IPv4 , plen :: Word8 } |
+               ZPrefixV6 { v6address :: IPv6 , plen :: Word8 } deriving (Eq,Show,Read)
 
-data ZNextHop = ZNHBlackhole | ZNHIPv4 IPv4 | ZNHBIfindex Word32  deriving (Eq,Show,Read)
+data ZNextHop = ZNHBlackhole
+              | ZNHIPv4 IPv4
+              | ZNHIfindex Word32
+              | ZNHIPv4Ifindex IPv4 Word32
+              | ZNHIPv6 IPv6
+              | ZNHIPv6Ifindex IPv6 Word32
+                deriving (Eq,Show,Read)
 
 data ZRoute = ZRoute { zrType :: Word8
                      , zrFlags :: Word8
