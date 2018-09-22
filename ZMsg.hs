@@ -12,6 +12,7 @@ data ZMsg =   ZMHello Word8
             | ZMIPV4RouteDelete ZRoute
             | ZMIPV4RouteAdd ZRoute
             | ZMNextHopUpdate ZNextHopUpdate
+            | ZMNextHopRegister ZNextHopUpdate
             | ZMNextHopUnregister ZNextHopUpdate
             | ZMRouterIdAdd
             | ZMUnknown { cmd :: Word16 , payload :: ByteString }

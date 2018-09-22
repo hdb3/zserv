@@ -85,6 +85,10 @@ zParser n' = do
           do route <- zRouteParser n
              return $ ZMIPV4RouteDelete route
 
+      | cmd == _ZEBRA_NEXTHOP_REGISTER ->
+          do up <- zNextHopUpdateParser True n
+             return $ ZMNextHopRegister up
+
       | cmd == _ZEBRA_NEXTHOP_UNREGISTER ->
           do up <- zNextHopUpdateParser True n
              return $ ZMNextHopUnregister up
