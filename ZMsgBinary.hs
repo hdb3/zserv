@@ -1,5 +1,5 @@
 {-# LANGUAGE RecordWildCards #-}
-module WireFormatBinary where
+module ZMsgBinary where
 
 import Data.Binary
 import Data.Binary.Put
@@ -9,6 +9,7 @@ import Data.IP
 import Data.Monoid((<>))
 
 import ZMsg
+import ZSpec
 
 instance Binary IPv4 where
 
@@ -39,6 +40,11 @@ data ZMsg =   ZMHello Word8
     deriving (Eq,Show,Read)
 
 -}
+
+instance Binary ZMsg where
+    get = undefined
+    put ( ZMHello w8 ) = put _ZEBRA_HELLO <> put w8
+    put z = error $ "put ZMsg failed for ZMsg: " ++ show z 
 
 {-
 -- H0
