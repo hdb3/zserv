@@ -14,7 +14,8 @@ data ZMsg =   ZMHello Word8
             | ZMNextHopUpdate ZNextHopUpdate
             | ZMNextHopRegister ZNextHopUpdate
             | ZMNextHopUnregister ZNextHopUpdate
-            | ZMRouterIdAdd
+            | ZMQRouterIdAdd
+            -- | ZMRouterIdAdd
             | ZMUnknown { cmd :: Word16 , payload :: ByteString }
     deriving (Eq,Show,Read)
 

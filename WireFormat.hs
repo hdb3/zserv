@@ -73,8 +73,8 @@ zParser n' = do
           do zia <- zInterfaceAddressParser
              return $ ZMInterfaceAddressAdd zia
 
-      | cmd == _ZEBRA_ROUTER_ID_UPDATE ->
-              do prefix <- zPrefixIPv4Parser n
+      | cmd == _ZEBRA_ROUTER_ID_UPDATE && n == 6 ->
+              do prefix <- zPrefixIPv4Parser
                  return $ ZMRouterIDUpdate prefix
 
       | cmd == _ZEBRA_IPV4_ROUTE_ADD ->
@@ -97,7 +97,7 @@ zParser n' = do
           do nh <- zNextHopUpdateParser False n
              return $ ZMNextHopUpdate nh
 
-      | cmd == _ZEBRA_ROUTER_ID_ADD  && n == 0 -> return ZMRouterIdAdd -- I suspect that the zero length version is a query...
+      | cmd == _ZEBRA_ROUTER_ID_ADD  && n == 0 -> return ZMQRouterIdAdd -- I suspect that the zero length version is a query...
 
       | otherwise -> do
             payload <- DAB.take n
@@ -311,8 +311,8 @@ zvPrefixIPv4Parser = do
     let v4address = fromHostAddress $ byteSwap32 prefix'
     return ZPrefixV4{..}
 
-zPrefixIPv4Parser :: Int -> Parser ZPrefix
-zPrefixIPv4Parser n = do
+zPrefixIPv4Parser :: Parser ZPrefix
+zPrefixIPv4Parser = do
 
     word8 _AF_INET
     prefix' <- anyWord32le

@@ -45,9 +45,11 @@ main = do
     putChar 'c'
     putStrLn "\n\n\n"
     --print' $ parse' zParser "001709"
-    verify "001709"
-    verify "001602c0a87a1d20"
-    --parseFlowFile "flow5"
+    verify "001709"           -- ZMHello
+    verify "0014"           -- ZMRouterIdAdd
+    verify "0001"           -- ZMQInterfaceAdd
+    verify "001602c0a87a1d20" -- ZMRouterIDUpdate
+    -- parseFlowFile "flow5"
 
     -- TODO ask why this requires relaex test in zStartUpdateParse - must be some parse error....
     -- print' $ parse' zParser "001c00000220c0a87a01"
@@ -70,7 +72,7 @@ verify c8 = do
     either (\errString -> putStrLn $ "decode failed for string " ++ toHex bs ++ " (" ++ errString ++ ")")
            (\rightZMsg -> do let bs' = encode' rightZMsg
                              if bs == bs' then putStrLn $ "OK (" ++ toHex bs ++ " = " ++ show rightZMsg ++ ")"
-                             else putStrLn $ "decode failed for string " ++ toHex bs ++ " /= " ++ toHex bs' )
+                             else putStrLn $ "decode failed for string " ++ toHex bs ++ " /= " ++ toHex bs'  ++ " (" ++ show rightZMsg ++ ")")
            zmsg
     where encode' = L.toStrict . encode
 

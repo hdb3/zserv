@@ -23,27 +23,12 @@ instance Binary IPv6 where
     -- put (IP6 (w1, w2, w3, w4)) = put w1 <> put w2 <> put w3 <> put w4
     put ipV6 = mapM_ put (fromIPv6b ipV6)
 
-{-
--- H2
-data ZMsg =   ZMHello Word8
-            | ZMInterfaceAdd ZInterface
-            | ZMQInterfaceAdd
-            | ZMInterfaceAddressAdd ZInterfaceAddress
-            | ZMRouterIDUpdate ZPrefix
-            | ZMIPV4RouteDelete ZRoute
-            | ZMIPV4RouteAdd ZRoute
-            | ZMNextHopUpdate ZNextHopUpdate
-            | ZMNextHopRegister ZNextHopUpdate
-            | ZMNextHopUnregister ZNextHopUpdate
-            | ZMRouterIdAdd
-            | ZMUnknown { cmd :: Word16 , payload :: ByteString }
-    deriving (Eq,Show,Read)
-
--}
-
 instance Binary ZMsg where
     get = undefined
     put ( ZMHello w8 ) = put _ZEBRA_HELLO <> put w8
+    put ( ZMQRouterIdAdd ) = put _ZEBRA_ROUTER_ID_ADD
+    put ( ZMQInterfaceAdd ) = put _ZEBRA_INTERFACE_ADD
+    put ( ZMRouterIDUpdate zPrefix ) = put _ZEBRA_ROUTER_ID_UPDATE <> put zPrefix
     put z = error $ "put ZMsg failed for ZMsg: " ++ show z 
 
 {-
@@ -95,8 +80,8 @@ data ZPrefix = ZPrefixV4 { v4address :: IPv4 , plen :: Word8 } |
 -}
 instance Binary ZPrefix where
     get = undefined
-    put ZPrefixV4{..} = put plen <> put v4address
-    put ZPrefixV6{..} = put plen <> put v6address
+    put ZPrefixV4{..} = put _AF_INET <> put v4address <> put plen
+    put ZPrefixV6{..} = put _AF_INET6 <> put v6address <> put plen
 
 {-
 -- H0
