@@ -27,35 +27,10 @@ instance Binary ZMsg where
     put ( ZMNextHopUnregister reg ) = put _ZEBRA_NEXTHOP_UNREGISTER <> put reg
     put ( ZMInterfaceAdd interface ) = put _ZEBRA_INTERFACE_ADD <> put interface
     put ( ZMInterfaceAddressAdd intAddr ) = put _ZEBRA_INTERFACE_ADDRESS_ADD <> put intAddr
+    put ( ZMIPV4RouteAdd route ) = put _ZEBRA_IPV4_ROUTE_ADD <> put route
+    put ( ZMIPV4RouteDelete route ) = put _ZEBRA_IPV4_ROUTE_DELETE <> put route
     put z = error $ "put ZMsg failed for ZMsg: " ++ show z 
 
-instance Binary ZInterfaceAddress where
-    get = undefined
-    put ZInterfaceAddressV4{..} = put ifindex <> put flags <> put _AF_INET <> put addressA <> put plen <> put addressB
-    put ZInterfaceAddressV6{..} = put ifindex <> put flags <> put _AF_INET6 <> put v6addressA <> put plen <> put v6addressB
-
-{-
-zInterfaceAddressParser :: Parser ZInterfaceAddress
-zInterfaceAddressParser = do
-    ifindex <- anyWord32be
-    flags <- anyWord8
-    afi  <- anyWord8
-    if | afi == _AF_INET  -> zInterfaceAddressParserV4 ifindex flags
-       | afi == _AF_INET6 -> zInterfaceAddressParserV6 ifindex flags
-
-zInterfaceAddressParserV4 ifindex flags = do
-    addressA <- zIPv4
-    plen <- anyWord8
-    addressB <- zIPv4
-    return ZInterfaceAddressV4{..}
-
-zInterfaceAddressParserV6 ifindex flags = do
-    v6addressA <- zIPv6
-    plen <- anyWord8
-    v6addressB <- zIPv6
-    return ZInterfaceAddressV6{..}
-
--}
 -- **********************************************************************************
 
 instance Binary IPv4 where
@@ -91,36 +66,14 @@ putzvPrefix ZPrefixV4{..} = do
        | plen < 25  -> putWord16be (unsafeShiftR (fromIntegral address) 16) >> putWord8 (unsafeShiftR (fromIntegral address) 8)
        | plen < 33  -> put v4address
        | otherwise -> error $ "putzvPrefix: invalid plen - " ++ show plen
-{-
-readPrefix1Byte = do
-    b0 <- anyWord8
-    return (unsafeShiftL (fromIntegral b0) 24)
 
-readPrefix2Byte = do
-    b0 <- anyWord16be
-    return (unsafeShiftL (fromIntegral b0) 16) 
+putRoutePrefixV4 ZPrefixV4{..} = putWord16be 0x00 <> -- 'SAFI' for IPv4!?
+                                 putWord8 plen <> put v4address
 
-readPrefix3Byte = do
-    b0 <- anyWord16be
-    b1 <- anyWord8
-    return (fromIntegral b1 .|. unsafeShiftL (fromIntegral b0) 16)
-    
-readPrefix4Byte = anyWord32be
-    
-zvPrefixIPv4Parser :: Parser ZPrefix
-zvPrefixIPv4Parser = do
-    plen <- anyWord8
-    prefix' <- 
-        if | plen == 0  -> return 0
-           | plen < 9   -> readPrefix1Byte
-           | plen < 17  -> readPrefix2Byte
-           | plen < 25  -> readPrefix3Byte
-           | plen < 33  -> readPrefix4Byte 
-    let v4address = fromHostAddress $ byteSwap32 prefix'
-    return ZPrefixV4{..}
-
-
--}
+instance Binary ZInterfaceAddress where
+    get = undefined
+    put ZInterfaceAddressV4{..} = put ifindex <> put flags <> put _AF_INET <> put addressA <> put plen <> put addressB
+    put ZInterfaceAddressV6{..} = put ifindex <> put flags <> put _AF_INET6 <> put v6addressA <> put plen <> put v6addressB
 
 instance {-# OVERLAPPING #-} Binary [ZNextHop] where
     get = undefined
@@ -157,46 +110,33 @@ instance Binary ZInterface where
 putCountedByteString bs = putWord32be (fromIntegral (BS.length bs)) <> putByteString bs
 pad n bs = BS.take n (BS.append bs (BS.replicate n 0x00))
 
-{-
-zInterfaceParser :: Int -> Parser ZInterface
-zInterfaceParser n = do
-    ifname' <- DAB.take 20
-    let ifname = BS.takeWhile ( 0 /= ) ifname'
-    ifindex <- anyWord32be
-    status <- anyWord8
-    if_flags <- anyWord64be
-    metric <- anyWord32be
-    ifmtu <- anyWord32be
-    ifmtu6 <- anyWord32be
-    bandwidth <- anyWord32be
-    linkLayerType <- anyWord32be
-    hardwareAddressLength <- anyWord32be
-    hardwareAddress <- DAB.take (fromIntegral hardwareAddressLength)
-    word8 0x00
-    return $ --assert (n == 58 + fromIntegral hardwareAddressLength)
-
-data ZInterface = ZInterface { ifname :: ByteString
-                             , ifindex :: Word32
-                             , status :: Word8
-                             , if_flags :: Word64
-                             , metric :: Word32
-                             , ifmtu :: Word32
-                             , ifmtu6 :: Word32
-                             , bandwidth :: Word32
-                             , linkLayerType :: Word32
-                             , hardwareAddress :: ByteString
-                             -- there is a placeholder here for 'link params'
-                             -- which is for TE - but it is really longwinded so won't bother doing it now
-                             } deriving (Eq,Show,Read)
--}
-
 
 instance Binary ZRoute where
     get = undefined
-    put ZRoute{..} = put zrType <> put zrFlags <> put zrMsg <> put zrSafi <> putzvPrefix zrPrefix <> put zrNextHops <> put zrDistance <> put zrMetric <> put zrMtu <> put zrTag
+    -- put ZRoute{..} = put zrType <> put zrFlags <> put zrMsg <> put zrSafi <> putzvPrefix zrPrefix <> put zrNextHops <> put zrDistance <> put zrMetric <> put zrMtu <> put zrTag
+    put ZRoute{..} =
+        do
+        let zrMsg      = if null zrNextHops then 0 else bit _ZAPI_MESSAGE_NEXTHOP
+            zrMsg'     = zrMsg      .|. if isJust zrDistance then bit _ZAPI_MESSAGE_DISTANCE else 0
+            zrMsg''    = zrMsg'     .|. if isJust zrMetric then bit _ZAPI_MESSAGE_METRIC else 0
+            zrMsg'''   = zrMsg''    .|. if isJust zrMtu then bit _ZAPI_MESSAGE_MTU else 0
+            zrMsg''''  = zrMsg'''   .|. if isJust zrTag then bit _ZAPI_MESSAGE_TAG else 0
+        put zrType <> put zrFlags <> put zrMsg'''' <> putRoutePrefixV4 zrPrefix
+        --when (not (null zrNextHops) (put zrNextHops)
+        --when (isJust zrDistance) (put zrDistance)
+        --when (isJust zrzrMetric) (put zrMetric)
+        --when (isJust zrMtu) (put zrMtu)
+        --when (isJust zrTag) (put zrTag)
 
 {-
--- *** TODO ***
+    zrNextHops <- if testBit zrMsg _ZAPI_MESSAGE_NEXTHOP then do nextHopCount <- anyWord8
+                                                                 count (fromIntegral nextHopCount) zNextHopParser
+                                                         else return []
+    zrDistance <- if testBit zrMsg _ZAPI_MESSAGE_DISTANCE then fmap Just anyWord8 else return Nothing
+    zrMetric <- if testBit zrMsg _ZAPI_MESSAGE_METRIC then fmap Just anyWord32be else return Nothing
+    zrMtu <- if testBit zrMsg _ZAPI_MESSAGE_MTU then fmap Just anyWord32be else return Nothing
+    zrTag <- if testBit zrMsg _ZAPI_MESSAGE_TAG then fmap Just anyWord32be else return Nothing
+
 data ZRoute = ZRoute { zrType :: Word8
                      , zrFlags :: Word8
                      , zrMsg :: Word8
@@ -209,16 +149,4 @@ data ZRoute = ZRoute { zrType :: Word8
                      , zrTag :: Maybe Word32
                      } deriving (Eq,Show,Read)
 
-data ZInterfaceAddress = ZInterfaceAddressV4 { ifindex :: Word32
-                                             , flags :: Word8
-                                             , addressA :: IPv4
-                                             , plen :: Word8
-                                             , addressB :: IPv4
-                                             }  |
-                         ZInterfaceAddressV6 { ifindex :: Word32
-                                             , flags :: Word8
-                                             , v6addressA :: IPv6
-                                             , plen :: Word8
-                                             , v6addressB :: IPv6
-                                             } deriving (Eq,Show,Read)
 -}

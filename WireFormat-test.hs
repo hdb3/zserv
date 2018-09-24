@@ -24,9 +24,10 @@ import WireFormat
 
 main = do
     -- screenClear
+    verify "00080909080001180c000100000000"
+    -- verifyFlowFile "flow2"
     -- print' $ parse' zParser "000165746830000000000000000000000000000000000000000205000000000001104300000000000005dc000005dc0000000000000001000000065254008d177f00"
     -- parseFlowFile "flow1"
-    verifyFlowFile "flow1"
     -- verify "001b00000220c0a87a01"           -- ZMNextHopRegister
     -- verify "001709"           -- ZMHello
     -- verify "0014"           -- ZMRouterIdAdd
