@@ -115,37 +115,7 @@ zNextHopParser = do
        | nextHopType == _ZEBRA_NEXTHOP_IFINDEX -> do
              w32 <- anyWord32be
              return $ ZNHIfindex w32
-{-
--}
-{-
-when there is no next hop then 5 bytes of zero are sent, otherwise,
-where a next hop is present the first field sent is a 4 byte metric followed by a 1 byte zero pad
-and then N x {  byte hoptype, followed by a variant field}
-there are a number of next hop types:
-for types 
-              ZEBRA_NEXTHOP_IPV4: 
-the value is an IPv4
-for
-              ZEBRA_NEXTHOP_IFINDEX:
-              ZEBRA_NEXTHOP_IFNAME:
-the value is a 4 byte ifindex
 
-for these it is an 8 byte tuple of IPv4 and 4 byte ifindex
-              ZEBRA_NEXTHOP_IPV4_IFINDEX:
-              ZEBRA_NEXTHOP_IPV4_IFNAME:
-this taes 16 byte ipv6
-              case ZEBRA_NEXTHOP_IPV6:
-
-and these are 20 bytes - 16 byte ipv6 + 4 byte ifindex
-              case ZEBRA_NEXTHOP_IPV6_IFINDEX:
-              case ZEBRA_NEXTHOP_IPV6_IFNAME:
-
-in summarry after the prefix there are either 5x0 or 5x? followed by 1 or more variants of either 5, 9, 17 or 21
-
-5x0 is one terninating parser
-metric(4)+1 is a root parser for the others
-
--}
 
 zNextHopUpdateParser :: Bool -> Int -> Parser ZNextHopUpdate
 zNextHopUpdateParser getFlags n = do
@@ -320,10 +290,3 @@ zPrefixIPv4Parser = do
     let v4address = fromHostAddress prefix'
     plen <- anyWord8
     return ZPrefixV4{..}
-
-{- NOTE - there are alternative forms for prefix i.e.:
-
-AF_INET =2 - size 4
-AF_INET6 = 10 size 16
-AF_ETHERNET = AF_PACKET = 17 size 6
--}

@@ -45,10 +45,11 @@ main = do
     putChar 'c'
     putStrLn "\n\n\n"
     --print' $ parse' zParser "001709"
-    verify "001709"           -- ZMHello
-    verify "0014"           -- ZMRouterIdAdd
-    verify "0001"           -- ZMQInterfaceAdd
-    verify "001602c0a87a1d20" -- ZMRouterIDUpdate
+    verify "001b00000220c0a87a01"           -- ZMNextHopRegister
+    --verify "001709"           -- ZMHello
+    --verify "0014"           -- ZMRouterIdAdd
+    --verify "0001"           -- ZMQInterfaceAdd
+    --verify "001602c0a87a1d20" -- ZMRouterIDUpdate
     -- parseFlowFile "flow5"
 
     -- TODO ask why this requires relaex test in zStartUpdateParse - must be some parse error....
