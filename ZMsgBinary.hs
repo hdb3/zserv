@@ -12,6 +12,8 @@ import Data.Monoid((<>))
 import ZMsg
 import ZSpec
 
+-- TODO!!!!
+-- make all of the implicit puword16/32 explicit for endianess!!!
 
 -- Entry points / public interface
 
@@ -24,8 +26,36 @@ instance Binary ZMsg where
     put ( ZMNextHopRegister reg ) = put _ZEBRA_NEXTHOP_REGISTER <> put reg
     put ( ZMNextHopUnregister reg ) = put _ZEBRA_NEXTHOP_UNREGISTER <> put reg
     put ( ZMInterfaceAdd interface ) = put _ZEBRA_INTERFACE_ADD <> put interface
+    put ( ZMInterfaceAddressAdd intAddr ) = put _ZEBRA_INTERFACE_ADDRESS_ADD <> put intAddr
     put z = error $ "put ZMsg failed for ZMsg: " ++ show z 
 
+instance Binary ZInterfaceAddress where
+    get = undefined
+    put ZInterfaceAddressV4{..} = put ifindex <> put flags <> put _AF_INET <> put addressA <> put plen <> put addressB
+    put ZInterfaceAddressV6{..} = put ifindex <> put flags <> put _AF_INET6 <> put v6addressA <> put plen <> put v6addressB
+
+{-
+zInterfaceAddressParser :: Parser ZInterfaceAddress
+zInterfaceAddressParser = do
+    ifindex <- anyWord32be
+    flags <- anyWord8
+    afi  <- anyWord8
+    if | afi == _AF_INET  -> zInterfaceAddressParserV4 ifindex flags
+       | afi == _AF_INET6 -> zInterfaceAddressParserV6 ifindex flags
+
+zInterfaceAddressParserV4 ifindex flags = do
+    addressA <- zIPv4
+    plen <- anyWord8
+    addressB <- zIPv4
+    return ZInterfaceAddressV4{..}
+
+zInterfaceAddressParserV6 ifindex flags = do
+    v6addressA <- zIPv6
+    plen <- anyWord8
+    v6addressB <- zIPv6
+    return ZInterfaceAddressV6{..}
+
+-}
 -- **********************************************************************************
 
 instance Binary IPv4 where
@@ -38,7 +68,7 @@ instance Binary IPv6 where
     get = undefined
     -- this would be the most direct form but Data.IP hides this constructor so we have to be indirect for simplicity
     -- put (IP6 (w1, w2, w3, w4)) = put w1 <> put w2 <> put w3 <> put w4
-    put ipV6 = mapM_ put (fromIPv6b ipV6)
+    put ipV6 = mapM_ putWord8 (map fromIntegral $ fromIPv6b ipV6)
 
 
 -- this puts 16 bit AFI, fixed length prefix, prefix last

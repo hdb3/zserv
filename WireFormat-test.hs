@@ -25,14 +25,14 @@ import WireFormat
 main = do
     -- screenClear
     -- print' $ parse' zParser "000165746830000000000000000000000000000000000000000205000000000001104300000000000005dc000005dc0000000000000001000000065254008d177f00"
-    verify "000165746830000000000000000000000000000000000000000205000000000001104300000000000005dc000005dc0000000000000001000000065254008d177f00" -- ZMRouterIDUpdate
     -- parseFlowFile "flow1"
-    -- verifyFlowFile "flow1"
+    verifyFlowFile "flow1"
     -- verify "001b00000220c0a87a01"           -- ZMNextHopRegister
     -- verify "001709"           -- ZMHello
     -- verify "0014"           -- ZMRouterIdAdd
     -- verify "0001"           -- ZMQInterfaceAdd
     -- verify "001602c0a87a1d20" -- ZMRouterIDUpdate
+    -- verify "000165746830000000000000000000000000000000000000000205000000000001104300000000000005dc000005dc0000000000000001000000065254008d177f00" -- ZMRouterIDUpdate
     -- parseFlowFile "flow5"
 
     -- TODO ask why this requires relaex test in zStartUpdateParse - must be some parse error....
