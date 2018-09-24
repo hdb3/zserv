@@ -22,34 +22,14 @@ import ZMsgBinary
 import ZSpec
 import WireFormat
 
-parse'' p bs = (toHex bs,DAB.parseOnly (p n) bs) where
-    n  = BS.length bs
-
-parse' p s = (C8.unpack s,DAB.parseOnly (p n) bs) where
-    bs = fromHex s
-    n  = BS.length bs
-
--- zParse needs the length of the supplied byteString, zParse' wraps this away
-zParser' :: BS.ByteString -> Either String ZMsg
-zParser' bs = DAB.parseOnly (zParser (BS.length bs)) bs 
-
-print' = putStrLn . show'
---print' (s,res) = putStrLn $ show'
-show' :: (String, Either String ZMsg) -> String
-show' (s,Right res) = s ++ " success " ++ show res
---show' (s,Right res) = show res
-show' (s,Left res) = s ++ " fail " ++ show res
-
 main = do
-    putChar (chr 27)
-    putChar 'c'
-    putStrLn "\n\n\n"
+    screenClear
     --print' $ parse' zParser "001709"
     verify "001b00000220c0a87a01"           -- ZMNextHopRegister
-    --verify "001709"           -- ZMHello
-    --verify "0014"           -- ZMRouterIdAdd
-    --verify "0001"           -- ZMQInterfaceAdd
-    --verify "001602c0a87a1d20" -- ZMRouterIDUpdate
+    verify "001709"           -- ZMHello
+    verify "0014"           -- ZMRouterIdAdd
+    verify "0001"           -- ZMQInterfaceAdd
+    verify "001602c0a87a1d20" -- ZMRouterIDUpdate
     -- parseFlowFile "flow5"
 
     -- TODO ask why this requires relaex test in zStartUpdateParse - must be some parse error....
@@ -101,3 +81,27 @@ parseFlowFile path = do
                       zmsgs
     putStrLn ""
 -}
+
+parse'' p bs = (toHex bs,DAB.parseOnly (p n) bs) where
+    n  = BS.length bs
+
+parse' p s = (C8.unpack s,DAB.parseOnly (p n) bs) where
+    bs = fromHex s
+    n  = BS.length bs
+
+-- zParse needs the length of the supplied byteString, zParse' wraps this away
+zParser' :: BS.ByteString -> Either String ZMsg
+zParser' bs = DAB.parseOnly (zParser (BS.length bs)) bs 
+
+print' = putStrLn . show'
+--print' (s,res) = putStrLn $ show'
+show' :: (String, Either String ZMsg) -> String
+show' (s,Right res) = s ++ " success " ++ show res
+--show' (s,Right res) = show res
+show' (s,Left res) = s ++ " fail " ++ show res
+
+screenClear = do
+    putChar (chr 27)
+    putChar 'c'
+    putStrLn "\n\n\n"
+

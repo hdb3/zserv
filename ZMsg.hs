@@ -12,19 +12,25 @@ data ZMsg =   ZMHello Word8
             | ZMIPV4RouteDelete ZRoute
             | ZMIPV4RouteAdd ZRoute
             | ZMNextHopUpdate ZNextHopUpdate
-            | ZMNextHopRegister ZNextHopUpdate
-            | ZMNextHopUnregister ZNextHopUpdate
+            | ZMNextHopRegister ZNextHopRegister
+            | ZMNextHopUnregister ZNextHopRegister
             | ZMQRouterIdAdd
             -- | ZMRouterIdAdd
-            | ZMUnknown { cmd :: Word16 , payload :: ByteString }
-    deriving (Eq,Show,Read)
+            | ZMUnknown { cmd :: Word16 , payload :: ByteString
+            } deriving (Eq,Show,Read)
 
+data ZNextHopRegister = ZNextHopRegister { connected :: Bool
+                                         , prefix :: ZPrefix
+                                         } deriving (Eq,Show,Read)
+  
+-- TODO better done as a single constructir with varian type fileds in IP4/6
 data ZInterfaceAddress = ZInterfaceAddressV4 { ifindex :: Word32
                                              , flags :: Word8
                                              , addressA :: IPv4
                                              , plen :: Word8
                                              , addressB :: IPv4
                                              }  |
+
                          ZInterfaceAddressV6 { ifindex :: Word32
                                              , flags :: Word8
                                              , v6addressA :: IPv6

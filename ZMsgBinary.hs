@@ -19,8 +19,9 @@ instance Binary ZMsg where
     put ( ZMHello w8 ) = put _ZEBRA_HELLO <> put w8
     put ( ZMQRouterIdAdd ) = put _ZEBRA_ROUTER_ID_ADD
     put ( ZMQInterfaceAdd ) = put _ZEBRA_INTERFACE_ADD
-    put ( ZMRouterIDUpdate zPrefix ) = put _ZEBRA_ROUTER_ID_UPDATE <> put' zPrefix
-    put ( ZMNextHopRegister nh ) = put _ZEBRA_NEXTHOP_REGISTER <> put nh
+    put ( ZMRouterIDUpdate prefix ) = put _ZEBRA_ROUTER_ID_UPDATE <> putZPrefix8 prefix
+    put ( ZMNextHopRegister reg ) = put _ZEBRA_NEXTHOP_REGISTER <> put reg
+    put ( ZMNextHopUnregister reg ) = put _ZEBRA_NEXTHOP_UNREGISTER <> put reg
     put z = error $ "put ZMsg failed for ZMsg: " ++ show z 
 
 -- **********************************************************************************
@@ -37,13 +38,16 @@ instance Binary IPv6 where
     -- put (IP6 (w1, w2, w3, w4)) = put w1 <> put w2 <> put w3 <> put w4
     put ipV6 = mapM_ put (fromIPv6b ipV6)
 
-instance Binary ZPrefix where
-    get = undefined
-    put ZPrefixV4{..} = put _AF_INET <> put plen <> put v4address
-    put ZPrefixV6{..} = put _AF_INET6 <> put plen <> put v6address
 
-put' ZPrefixV4{..} = put _AF_INET <> put v4address <> put plen
-put' ZPrefixV6{..} = put _AF_INET6 <> put v6address <> put plen
+-- this puts 16 bit AFI, fixed length prefix, prefix last
+putZPrefix16 :: ZPrefix -> Put
+putZPrefix16 ZPrefixV4{..} = put (fromIntegral _AF_INET :: Word16 ) <> put plen <> put v4address
+putZPrefix16 ZPrefixV6{..} = put (fromIntegral _AF_INET6 :: Word16 ) <> put plen <> put v6address
+
+-- this puts 8 bit AFI, fixed length prefix, prefix length last
+putZPrefix8 :: ZPrefix -> Put
+putZPrefix8 ZPrefixV4{..} = put _AF_INET  <> put v4address <> put plen
+putZPrefix8 ZPrefixV6{..} = put _AF_INET6 <> put v6address <> put plen
 
 instance Binary ZNextHop where
     get = undefined
@@ -56,11 +60,16 @@ instance Binary ZNextHop where
     -- ZNHIPv6Ifindex IPv6 Word32
 
 
+instance Binary ZNextHopRegister where
+    get = undefined
+    put ZNextHopRegister{..} = putWord8 connectedW8 <> putZPrefix16 prefix where
+        connectedW8 = if connected  then 0x01 else 0x00
+        -- arbitraryW8 = 0x01
 
 -- data ZNextHopUpdate = ZNextHopUpdate {flags :: Word8 , metric :: Word32 ,  prefix :: ZPrefix , nexthops :: [ZNextHop] } deriving (Eq,Show,Read)
 instance Binary ZNextHopUpdate where
     get = undefined
-    put ZNextHopUpdate{..} = put flags <> put metric <> put prefix <> put (fromIntegral (Prelude.length nexthops) :: Word8 )<> mapM_ put nexthops
+    put ZNextHopUpdate{..} = put flags <> put metric <> putZPrefix16 prefix <> put (fromIntegral (Prelude.length nexthops) :: Word8 )<> mapM_ put nexthops
     -- put flags <> put metric <> put prefix <> put (fromIntegral (Prelude.length nexthops) :: Word8 )<> mapM_ put nexthops
 
 

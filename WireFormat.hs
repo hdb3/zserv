@@ -37,7 +37,6 @@ zRawMessageParser = do
     return (cmd,BS.append cmdBS pl)
 
 
-
 zMessageParser :: Parser (Maybe ZMsg)
 zMessageParser = ( zMessageParser'' <|> return Nothing ) <?> "zserv wire format parser"
 zMessageParser'' = do
@@ -74,7 +73,7 @@ zParser n' = do
              return $ ZMInterfaceAddressAdd zia
 
       | cmd == _ZEBRA_ROUTER_ID_UPDATE && n == 6 ->
-              do prefix <- zPrefixIPv4Parser
+              do prefix <- zPrefix8Parser
                  return $ ZMRouterIDUpdate prefix
 
       | cmd == _ZEBRA_IPV4_ROUTE_ADD ->
@@ -86,12 +85,12 @@ zParser n' = do
              return $ ZMIPV4RouteDelete route
 
       | cmd == _ZEBRA_NEXTHOP_REGISTER ->
-          do up <- zNextHopUpdateParser True n
-             return $ ZMNextHopRegister up
+          do reg <- zNextHopRegisterParser
+             return $ ZMNextHopRegister reg
 
       | cmd == _ZEBRA_NEXTHOP_UNREGISTER ->
-          do up <- zNextHopUpdateParser True n
-             return $ ZMNextHopUnregister up
+          do reg <- zNextHopRegisterParser
+             return $ ZMNextHopUnregister reg
 
       | cmd == _ZEBRA_NEXTHOP_UPDATE ->
           do nh <- zNextHopUpdateParser False n
@@ -116,6 +115,13 @@ zNextHopParser = do
              w32 <- anyWord32be
              return $ ZNHIfindex w32
 
+zNextHopRegisterParser :: Parser ZNextHopRegister
+zNextHopRegisterParser = do
+    w8 <- anyWord8
+    let connected = not ( w8 == 0 )
+    prefix <- zPrefix16Parser
+    return ZNextHopRegister{..}
+    
 
 zNextHopUpdateParser :: Bool -> Int -> Parser ZNextHopUpdate
 zNextHopUpdateParser getFlags n = do
@@ -254,6 +260,19 @@ zInterfaceParser n = do
     return $ --assert (n == 58 + fromIntegral hardwareAddressLength)
              ZInterface {..} 
 
+-- Prefix parsers
+--
+-- there are multiple wireformats for prefixes - afi can be 8 or 16 bits
+--                                             - prefix can be compressed or not
+--                                             - prefix length can come before or after the prefix
+--                                             - can be IPv4 or IPv6
+--
+-- However, they all have the same semantics
+-- the challenge is that if they are transformed into a single canonical form then the subsequent encoder has to be selected
+-- rather than simply writing the prefixes as different types
+-- in order to simplify the external API I choose a common type and accept that there must be explicit encoding.
+-- this implies that the prefixes SHOULD NOT be made instances of Binary - rather explicit named put instances should be defined over the common types
+
 readPrefix1Byte = do
     b0 <- anyWord8
     return (unsafeShiftL (fromIntegral b0) 24)
@@ -281,12 +300,26 @@ zvPrefixIPv4Parser = do
     let v4address = fromHostAddress $ byteSwap32 prefix'
     return ZPrefixV4{..}
 
-zPrefixIPv4Parser :: Parser ZPrefix
-zPrefixIPv4Parser = do
-
-    word8 _AF_INET
-    prefix' <- anyWord32le
-    -- why this is anyWord32le not anyWord32be i have no idea...
-    let v4address = fromHostAddress prefix'
+-- this parses 16 bit AFI, fixed length prefix, prefix last
+zPrefix16Parser :: Parser ZPrefix
+zPrefix16Parser = do
+    afi16 <- anyWord16be
     plen <- anyWord8
-    return ZPrefixV4{..}
+    let afi = fromIntegral afi16 :: Word8
+    if | afi == _AF_INET  -> do v4address <- zIPv4
+                                return ZPrefixV4{..}
+       | afi == _AF_INET6 -> do v6address <- zIPv6
+                                return ZPrefixV6{..}
+       | otherwise -> error $ "zPrefix16Parser - invalid AFI - " ++ show afi
+
+-- this parses 8 bit AFI, fixed length prefix, prefix length last
+zPrefix8Parser :: Parser ZPrefix
+zPrefix8Parser = do
+    afi <- anyWord8
+    if | afi == _AF_INET -> do v4address <- zIPv4
+                               plen <- anyWord8
+                               return ZPrefixV4{..}
+       | afi == _AF_INET6 -> do v6address <- zIPv6
+                                plen <- anyWord8
+                                return ZPrefixV6{..}
+       | otherwise -> error $ "zPrefix8Parser - invalid AFI - " ++ show afi
