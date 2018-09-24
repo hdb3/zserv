@@ -1,11 +1,12 @@
-{-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE MultiWayIf,RecordWildCards,FlexibleInstances #-}
 module ZMsgBinary where
 
 import Data.Binary
 import Data.Binary.Put
-import Data.ByteString
+import qualified Data.ByteString as BS
 import Data.Word
 import Data.IP
+import Data.Bits
 import Data.Monoid((<>))
 
 import ZMsg
@@ -22,6 +23,7 @@ instance Binary ZMsg where
     put ( ZMRouterIDUpdate prefix ) = put _ZEBRA_ROUTER_ID_UPDATE <> putZPrefix8 prefix
     put ( ZMNextHopRegister reg ) = put _ZEBRA_NEXTHOP_REGISTER <> put reg
     put ( ZMNextHopUnregister reg ) = put _ZEBRA_NEXTHOP_UNREGISTER <> put reg
+    put ( ZMInterfaceAdd interface ) = put _ZEBRA_INTERFACE_ADD <> put interface
     put z = error $ "put ZMsg failed for ZMsg: " ++ show z 
 
 -- **********************************************************************************
@@ -49,6 +51,51 @@ putZPrefix8 :: ZPrefix -> Put
 putZPrefix8 ZPrefixV4{..} = put _AF_INET  <> put v4address <> put plen
 putZPrefix8 ZPrefixV6{..} = put _AF_INET6 <> put v6address <> put plen
 
+-- placeholder for fixing ZRoute to hold v4 and v6...
+putzvPrefix ZPrefixV4{..} = do
+    put plen
+    let address = toHostAddress v4address
+    if | plen == 0  -> return ()
+       | plen < 9   -> putWord8 (unsafeShiftR (fromIntegral address) 24)
+       | plen < 17  -> putWord16be (unsafeShiftR (fromIntegral address) 16)
+       | plen < 25  -> putWord16be (unsafeShiftR (fromIntegral address) 16) >> putWord8 (unsafeShiftR (fromIntegral address) 8)
+       | plen < 33  -> put v4address
+       | otherwise -> error $ "putzvPrefix: invalid plen - " ++ show plen
+{-
+readPrefix1Byte = do
+    b0 <- anyWord8
+    return (unsafeShiftL (fromIntegral b0) 24)
+
+readPrefix2Byte = do
+    b0 <- anyWord16be
+    return (unsafeShiftL (fromIntegral b0) 16) 
+
+readPrefix3Byte = do
+    b0 <- anyWord16be
+    b1 <- anyWord8
+    return (fromIntegral b1 .|. unsafeShiftL (fromIntegral b0) 16)
+    
+readPrefix4Byte = anyWord32be
+    
+zvPrefixIPv4Parser :: Parser ZPrefix
+zvPrefixIPv4Parser = do
+    plen <- anyWord8
+    prefix' <- 
+        if | plen == 0  -> return 0
+           | plen < 9   -> readPrefix1Byte
+           | plen < 17  -> readPrefix2Byte
+           | plen < 25  -> readPrefix3Byte
+           | plen < 33  -> readPrefix4Byte 
+    let v4address = fromHostAddress $ byteSwap32 prefix'
+    return ZPrefixV4{..}
+
+
+-}
+
+instance {-# OVERLAPPING #-} Binary [ZNextHop] where
+    get = undefined
+    put nexthops = put (fromIntegral (length nexthops) :: Word8 ) <> mapM_ put nexthops
+
 instance Binary ZNextHop where
     get = undefined
     put ZNHBlackhole = put _ZEBRA_NEXTHOP_BLACKHOLE
@@ -69,9 +116,54 @@ instance Binary ZNextHopRegister where
 -- data ZNextHopUpdate = ZNextHopUpdate {flags :: Word8 , metric :: Word32 ,  prefix :: ZPrefix , nexthops :: [ZNextHop] } deriving (Eq,Show,Read)
 instance Binary ZNextHopUpdate where
     get = undefined
-    put ZNextHopUpdate{..} = put flags <> put metric <> putZPrefix16 prefix <> put (fromIntegral (Prelude.length nexthops) :: Word8 )<> mapM_ put nexthops
-    -- put flags <> put metric <> put prefix <> put (fromIntegral (Prelude.length nexthops) :: Word8 )<> mapM_ put nexthops
+    put ZNextHopUpdate{..} = put flags <> put metric <> putZPrefix16 prefix <> put (fromIntegral (length nexthops) :: Word8 )<> mapM_ put nexthops
+    -- put flags <> put metric <> put prefix <> put (fromIntegral (length nexthops) :: Word8 )<> mapM_ put nexthops
 
+
+instance Binary ZInterface where
+    get = undefined
+    -- put ZInterface{..} = putByteString ifname -- <> put ifindex <> put status <> put if_flags <> put metric <> put ifmtu <> put ifmtu6 <> put bandwidth <> put linkLayerType <> put hardwareAddress
+    put ZInterface{..} = putByteString (pad 20 ifname) <> put ifindex <> put status <> put if_flags <> put metric <> put ifmtu <> put ifmtu6 <> put bandwidth <> put linkLayerType <> putCountedByteString hardwareAddress <> putWord8 0x00
+putCountedByteString bs = putWord32be (fromIntegral (BS.length bs)) <> putByteString bs
+pad n bs = BS.take n (BS.append bs (BS.replicate n 0x00))
+
+{-
+zInterfaceParser :: Int -> Parser ZInterface
+zInterfaceParser n = do
+    ifname' <- DAB.take 20
+    let ifname = BS.takeWhile ( 0 /= ) ifname'
+    ifindex <- anyWord32be
+    status <- anyWord8
+    if_flags <- anyWord64be
+    metric <- anyWord32be
+    ifmtu <- anyWord32be
+    ifmtu6 <- anyWord32be
+    bandwidth <- anyWord32be
+    linkLayerType <- anyWord32be
+    hardwareAddressLength <- anyWord32be
+    hardwareAddress <- DAB.take (fromIntegral hardwareAddressLength)
+    word8 0x00
+    return $ --assert (n == 58 + fromIntegral hardwareAddressLength)
+
+data ZInterface = ZInterface { ifname :: ByteString
+                             , ifindex :: Word32
+                             , status :: Word8
+                             , if_flags :: Word64
+                             , metric :: Word32
+                             , ifmtu :: Word32
+                             , ifmtu6 :: Word32
+                             , bandwidth :: Word32
+                             , linkLayerType :: Word32
+                             , hardwareAddress :: ByteString
+                             -- there is a placeholder here for 'link params'
+                             -- which is for TE - but it is really longwinded so won't bother doing it now
+                             } deriving (Eq,Show,Read)
+-}
+
+
+instance Binary ZRoute where
+    get = undefined
+    put ZRoute{..} = put zrType <> put zrFlags <> put zrMsg <> put zrSafi <> putzvPrefix zrPrefix <> put zrNextHops <> put zrDistance <> put zrMetric <> put zrMtu <> put zrTag
 
 {-
 -- *** TODO ***
@@ -99,19 +191,4 @@ data ZInterfaceAddress = ZInterfaceAddressV4 { ifindex :: Word32
                                              , plen :: Word8
                                              , v6addressB :: IPv6
                                              } deriving (Eq,Show,Read)
-
-data ZInterface = ZInterface { ifname :: ByteString
-                             , ifindex :: Word32
-                             , status :: Word8
-                             , if_flags :: Word64
-                             , metric :: Word32
-                             , ifmtu :: Word32
-                             , ifmtu6 :: Word32
-                             , bandwidth :: Word32
-                             , linkLayerType :: Word32
-                             , hardwareAddress :: ByteString
-                             -- there is a placeholder here for 'link params'
-                             -- which is for TE - but it is really longwinded so won't bother doing it now
-                             } deriving (Eq,Show,Read)
-
 -}
