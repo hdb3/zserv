@@ -53,6 +53,7 @@ data ZInterface = ZInterface { ifname :: ByteString
                              } deriving (Eq,Show,Read)
 
 
+-- data ZNextHopUpdate = ZNextHopUpdate {metric :: Word32 ,  prefix :: ZPrefix , nexthops :: [ZNextHop] } deriving (Eq,Show,Read)
 data ZNextHopUpdate = ZNextHopUpdate {flags :: Word8 , metric :: Word32 ,  prefix :: ZPrefix , nexthops :: [ZNextHop] } deriving (Eq,Show,Read)
 
 data ZPrefix = ZPrefixV4 { v4address :: IPv4 , plen :: Word8 } |

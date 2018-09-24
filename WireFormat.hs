@@ -93,7 +93,7 @@ zParser n' = do
              return $ ZMNextHopUnregister reg
 
       | cmd == _ZEBRA_NEXTHOP_UPDATE ->
-          do nh <- zNextHopUpdateParser False n
+          do nh <- zNextHopUpdateParser
              return $ ZMNextHopUpdate nh
 
       | cmd == _ZEBRA_ROUTER_ID_ADD  && n == 0 -> return ZMQRouterIdAdd -- I suspect that the zero length version is a query...
@@ -123,63 +123,14 @@ zNextHopRegisterParser = do
     return ZNextHopRegister{..}
     
 
-zNextHopUpdateParser :: Bool -> Int -> Parser ZNextHopUpdate
-zNextHopUpdateParser getFlags n = do
-    flags <- if getFlags then anyWord8 else return 0
-    let n' = if getFlags then n-1 else n
-    afi16  <- anyWord16be
-    let afi = fromIntegral afi16 -- yes - in thi smmessage the AFI is 16bits!!
-                                 -- and, also, the prefix is not compressed....
-    plen <- anyWord8
-    (prefix,n'') <- if | afi == _AF_INET  -> do v4address <- zIPv4
-                                                return (ZPrefixV4{..},n'-6)
-                       | afi == _AF_INET6 -> do v6address <- zIPv6
-                                                return (ZPrefixV6{..},n'-18)
-    (metric,nexthops) <- zStartUpdateParse n''
-    return ZNextHopUpdate{..}
-
-zStartUpdateParse n | n == 0 = return (0,[])
-                    | n < 5  = return (0,[])
-                    | n > 4  = do
+zNextHopUpdateParser :: Parser ZNextHopUpdate
+zNextHopUpdateParser = do
+    let flags = 0x00
+    prefix <- zPrefix16Parser
     metric <- anyWord32be
     nextHopCount <- anyWord8
     nexthops <- count (fromIntegral nextHopCount) zNextHopParser
-{-
-    word8 0 -- zero pad in all cases
-    nexthops <- if 0 == metric then return []
-                else do nextHopCount <- anyWord8
-                        count (fromIntegral nextHopCount) zNextHopParser
-                -- else zGetNextUpdate (n-5,[])
--}
-    return (metric,nexthops)
-    where
-    zGetNextUpdate (n,nexthops) =
-        do hopType <- anyWord8
-           if | hopType == _ZEBRA_NEXTHOP_IPV4 && n > 3 ->
-               do ipv4 <- zIPv4
-                  zGetNextUpdate (n-5, (ZNHIPv4 ipv4) : nexthops)
-
-              | (hopType == _ZEBRA_NEXTHOP_IFINDEX) || (hopType == _ZEBRA_NEXTHOP_IFNAME) && n > 3 ->
-               do ifindex <- anyWord32be
-                  zGetNextUpdate (n-5, (ZNHIfindex ifindex) : nexthops)
-
-              | (hopType == _ZEBRA_NEXTHOP_IPV4_IFINDEX) || (hopType == _ZEBRA_NEXTHOP_IPV4_IFNAME) && n > 7 ->
-               do ipv4 <- zIPv4
-                  ifindex <- anyWord32be
-                  zGetNextUpdate (n-5, (ZNHIPv4Ifindex ipv4 ifindex) : nexthops)
-
-              | (hopType == _ZEBRA_NEXTHOP_IPV6) && n > 15 ->
-               do ipv6 <-zIPv6
-                  zGetNextUpdate (n-5, (ZNHIPv6 ipv6) : nexthops)
-
-              | (hopType == _ZEBRA_NEXTHOP_IPV6_IFINDEX) || (hopType == _ZEBRA_NEXTHOP_IPV6_IFNAME) && n > 19 ->
-               do ipv6 <- zIPv6
-                  ifindex <- anyWord32be
-                  zGetNextUpdate (n-5, (ZNHIPv6Ifindex ipv6 ifindex) : nexthops)
-              | hopType == _ZEBRA_NEXTHOP_BLACKHOLE -> 
-                  zGetNextUpdate (n-1, ZNHBlackhole : nexthops)
-              | otherwise -> return nexthops
-
+    return ZNextHopUpdate{..}
 
 zInterfaceAddressParser :: Parser ZInterfaceAddress
 zInterfaceAddressParser = do
@@ -190,26 +141,16 @@ zInterfaceAddressParser = do
        | afi == _AF_INET6 -> zInterfaceAddressParserV6 ifindex flags
 
 zInterfaceAddressParserV4 ifindex flags = do
-    --addressA' <- anyWord32le
-    --let addressA = fromHostAddress addressA'
     addressA <- zIPv4
     plen <- anyWord8
     addressB <- zIPv4
-    --addressB' <- anyWord32le
-    --let addressB = fromHostAddress addressB'
     return ZInterfaceAddressV4{..}
 
 zInterfaceAddressParserV6 ifindex flags = do
-    --v6addressA' <- DAB.take 16
-    --let v6addressA = bsToIPv6 v6addressA'
     v6addressA <- zIPv6
     plen <- anyWord8
     v6addressB <- zIPv6
-    --v6addressB' <- DAB.take 16
-    --let v6addressB = bsToIPv6 v6addressB'
     return ZInterfaceAddressV6{..}
-    -- where
-    -- bsToIPv6 = toIPv6b . map fromIntegral . BS.unpack
 
 zIPv4 = zIPv4Parser
 zIPv4Parser :: Parser IPv4
@@ -245,7 +186,6 @@ zInterfaceParser :: Int -> Parser ZInterface
 zInterfaceParser n = do
     ifname' <- DAB.take 20
     let ifname = BS.takeWhile ( 0 /= ) ifname'
-    -- ifname <- DAB.takeWhile ( 0 /= )
     ifindex <- anyWord32be 
     status <- anyWord8
     if_flags <- anyWord64be

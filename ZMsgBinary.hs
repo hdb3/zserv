@@ -34,7 +34,7 @@ instance Binary IPv4 where
 instance Binary IPv6 where
 
     get = undefined
-    -- this is the most direct form but Data.IP hides this constructor so we have to be indirect for simplicity
+    -- this would be the most direct form but Data.IP hides this constructor so we have to be indirect for simplicity
     -- put (IP6 (w1, w2, w3, w4)) = put w1 <> put w2 <> put w3 <> put w4
     put ipV6 = mapM_ put (fromIPv6b ipV6)
 
