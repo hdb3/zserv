@@ -1,9 +1,8 @@
-{-# LANGUAGE RecordWildCards,MultiWayIf,OverloadedStrings #-}
+{-# LANGUAGE MultiWayIf,OverloadedStrings #-}
 module Main where
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Lazy as L
 import qualified Data.ByteString.Char8 as C8
---import Data.Attoparsec.ByteString -- from package attoparsec
 import qualified Data.Attoparsec.ByteString as DAB
 import Data.Attoparsec.Binary -- from package attoparsec-binary
 import Control.Applicative
@@ -14,7 +13,6 @@ import Data.Bits
 import Data.Word
 import Data.Char
 import Data.Binary
---import Data.Either
 
 import Debug
 import ZMsg
@@ -24,8 +22,8 @@ import WireFormat
 
 main = do
     -- screenClear
-    verify "00080909080001180c000100000000"
-    -- verifyFlowFile "flow2"
+    -- verify "00080909080001180c000100000000"
+    verifyFlowFile "flow5"
     -- print' $ parse' zParser "000165746830000000000000000000000000000000000000000205000000000001104300000000000005dc000005dc0000000000000001000000065254008d177f00"
     -- parseFlowFile "flow1"
     -- verify "001b00000220c0a87a01"           -- ZMNextHopRegister
@@ -54,7 +52,7 @@ verify :: C8.ByteString -> IO ()
 verify c8 = verify' (fromHex c8)
 
 verify' :: BS.ByteString -> IO ()
-verify' bs = do
+verify' bs =
     either (\errString -> putStrLn $ "decode failed for string " ++ toHex bs ++ " (" ++ errString ++ ")")
            (\rightZMsg -> do let bs' = encode' rightZMsg
                              if bs == bs' then putStrLn $ "OK (" ++ toHex bs ++ " = " ++ show rightZMsg ++ ")"
@@ -66,7 +64,6 @@ verifyFlowFile path = do
     flow <- BS.readFile path
     either putStrLn
            ( mapM_ ( \(_,pl) -> verify' pl) )
-           --( mapM_ ( \(cmd,pl) -> putStrLn $ "cmd " ++ show cmd ++ " len " ++ show (BS.length pl-2) ++ " : " ++ (toHex pl) ))
            ( DAB.parseOnly zRawFlowParser flow )
 
 parseFlowFile path = do
@@ -76,12 +73,12 @@ parseFlowFile path = do
     -- let zmsgs = parseOnly (zFlowParser <* endOfInput) flow
     putStrLn $ "\nraw  " ++ path
     either putStrLn
-           ( mapM_ ( \(cmd,pl) -> putStrLn $ "cmd " ++ show cmd ++ " len " ++ show (BS.length pl-2) ++ " : " ++ (toHex pl) ))
+           ( mapM_ ( \(cmd,pl) -> putStrLn $ "cmd " ++ show cmd ++ " len " ++ show (BS.length pl-2) ++ " : " ++ toHex pl ))
            raw
-    let parsed = either Left  (Right . map eparse) raw
+    let parsed = fmap (map eparse) raw
         eparse = parse'' zParser . snd
 
-    putStrLn $ "\neparsed"
+    putStrLn "\neparsed"
     putStrLn $ either show
                       (unlines . map show')
                       -- ( unlines . map (\(bs,res) -> toHex bs ++ " / " ++ show res ))
@@ -106,10 +103,8 @@ zParser' :: BS.ByteString -> Either String ZMsg
 zParser' bs = DAB.parseOnly (zParser (BS.length bs)) bs 
 
 print' = putStrLn . show'
---print' (s,res) = putStrLn $ show'
 show' :: (String, Either String ZMsg) -> String
 show' (s,Right res) = s ++ " success " ++ show res
---show' (s,Right res) = show res
 show' (s,Left res) = s ++ " fail " ++ show res
 
 screenClear = do

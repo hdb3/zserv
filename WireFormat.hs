@@ -118,7 +118,7 @@ zNextHopParser = do
 zNextHopRegisterParser :: Parser ZNextHopRegister
 zNextHopRegisterParser = do
     w8 <- anyWord8
-    let connected = not ( w8 == 0 )
+    let connected = w8 /= 0
     prefix <- zPrefix16Parser
     return ZNextHopRegister{..}
     
@@ -188,7 +188,7 @@ zInterfaceParser n = do
     let ifname = BS.takeWhile ( 0 /= ) ifname'
     ifindex <- anyWord32be 
     status <- anyWord8
-    if_flags <- anyWord64be
+    ifFlags <- anyWord64be
     metric <- anyWord32be
     ifmtu <- anyWord32be
     ifmtu6 <- anyWord32be

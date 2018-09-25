@@ -1,4 +1,4 @@
-{-# LANGUAGE DataKinds,DuplicateRecordFields,RecordWildCards #-}
+{-# LANGUAGE DataKinds,DuplicateRecordFields#-}
 module ZMsg where
 import Data.ByteString
 import Data.Word
@@ -41,7 +41,7 @@ data ZInterfaceAddress = ZInterfaceAddressV4 { ifindex :: Word32
 data ZInterface = ZInterface { ifname :: ByteString
                              , ifindex :: Word32
                              , status :: Word8
-                             , if_flags :: Word64
+                             , ifFlags :: Word64
                              , metric :: Word32
                              , ifmtu :: Word32
                              , ifmtu6 :: Word32
