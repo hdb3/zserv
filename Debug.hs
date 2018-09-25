@@ -7,7 +7,7 @@ import qualified Data.ByteString.Lazy as L
 import qualified Data.ByteString.Char8 as C8
 
 zpad n s | n <= length s = s
-         | otherwise = '0' : s
+         | otherwise = zpad n $ '0' : s
 hex8 :: Word8 -> String
 hex8 x = zpad 2 $ Numeric.showHex x ""
 hex16 :: Word16 -> String

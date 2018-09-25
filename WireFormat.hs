@@ -213,21 +213,8 @@ zInterfaceParser n = do
 -- in order to simplify the external API I choose a common type and accept that there must be explicit encoding.
 -- this implies that the prefixes SHOULD NOT be made instances of Binary - rather explicit named put instances should be defined over the common types
 
-readPrefix1Byte = do
-    b0 <- anyWord8
-    return (unsafeShiftL (fromIntegral b0) 24)
 
-readPrefix2Byte = do
-    b0 <- anyWord16be
-    return (unsafeShiftL (fromIntegral b0) 16)
-
-readPrefix3Byte = do
-    b0 <- anyWord16be
-    b1 <- anyWord8
-    return (fromIntegral b1 .|. unsafeShiftL (fromIntegral b0) 16)
-
-readPrefix4Byte = anyWord32be
-
+-- this does not parse the AFI, and parses a variable length prefix, prefix length first (obvs!)
 zvPrefixIPv4Parser :: Parser ZPrefix
 zvPrefixIPv4Parser = do
     plen <- anyWord8
@@ -239,6 +226,18 @@ zvPrefixIPv4Parser = do
            | plen < 33  -> readPrefix4Byte 
     let v4address = fromHostAddress $ byteSwap32 prefix'
     return ZPrefixV4{..}
+    where
+        readPrefix1Byte = do
+            b0 <- anyWord8
+            return (unsafeShiftL (fromIntegral b0) 24)
+        readPrefix2Byte = do
+            b0 <- anyWord16be
+            return (unsafeShiftL (fromIntegral b0) 16)
+        readPrefix3Byte = do
+            b0 <- anyWord16be
+            b1 <- anyWord8
+            return (unsafeShiftL (fromIntegral b1) 8 .|. unsafeShiftL (fromIntegral b0) 16)
+        readPrefix4Byte = anyWord32be
 
 -- this parses 16 bit AFI, fixed length prefix, prefix last
 zPrefix16Parser :: Parser ZPrefix

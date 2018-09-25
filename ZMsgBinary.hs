@@ -8,6 +8,8 @@ import Data.Word
 import Data.IP
 import Data.Bits
 import Data.Monoid((<>))
+import Data.Maybe(isJust,fromJust)
+import Control.Monad(when)
 
 import ZMsg
 import ZSpec
@@ -36,7 +38,7 @@ instance Binary ZMsg where
 instance Binary IPv4 where
 
     get = undefined
-    put = putWord32le . toHostAddress
+    put = putWord32le . toHostAddress -- note le not be because of the way Data.IP represents IPv4 internally!
 
 instance Binary IPv6 where
 
@@ -59,16 +61,18 @@ putZPrefix8 ZPrefixV6{..} = put _AF_INET6 <> put v6address <> put plen
 -- placeholder for fixing ZRoute to hold v4 and v6...
 putzvPrefix ZPrefixV4{..} = do
     put plen
-    let address = toHostAddress v4address
+    let address = byteSwap32 $ toHostAddress v4address
+    -- note byteSwap because of the way Data.IP represents IPv4 internally!
     if | plen == 0  -> return ()
-       | plen < 9   -> putWord8 (unsafeShiftR (fromIntegral address) 24)
-       | plen < 17  -> putWord16be (unsafeShiftR (fromIntegral address) 16)
-       | plen < 25  -> putWord16be (unsafeShiftR (fromIntegral address) 16) >> putWord8 (unsafeShiftR (fromIntegral address) 8)
+       | plen < 9   -> putWord8 (fromIntegral (unsafeShiftR address 24))
+       | plen < 17  -> putWord16be ( fromIntegral (unsafeShiftR address 16))
+       | plen < 25  -> putWord16be ( fromIntegral (unsafeShiftR address 16)) >> putWord8 (fromIntegral (unsafeShiftR address 8))
        | plen < 33  -> put v4address
        | otherwise -> error $ "putzvPrefix: invalid plen - " ++ show plen
 
-putRoutePrefixV4 ZPrefixV4{..} = putWord16be 0x00 <> -- 'SAFI' for IPv4!?
-                                 putWord8 plen <> put v4address
+putRoutePrefixV4 pfx@ZPrefixV4{..} = putWord16be 0x01 <> -- 'SAFI' for IPv4!?
+                                 --putWord8 plen <> put v4address
+                                 putzvPrefix pfx 
 
 instance Binary ZInterfaceAddress where
     get = undefined
@@ -96,16 +100,13 @@ instance Binary ZNextHopRegister where
         connectedW8 = if connected  then 0x01 else 0x00
         -- arbitraryW8 = 0x01
 
--- data ZNextHopUpdate = ZNextHopUpdate {flags :: Word8 , metric :: Word32 ,  prefix :: ZPrefix , nexthops :: [ZNextHop] } deriving (Eq,Show,Read)
 instance Binary ZNextHopUpdate where
     get = undefined
     put ZNextHopUpdate{..} = put flags <> put metric <> putZPrefix16 prefix <> put (fromIntegral (length nexthops) :: Word8 )<> mapM_ put nexthops
-    -- put flags <> put metric <> put prefix <> put (fromIntegral (length nexthops) :: Word8 )<> mapM_ put nexthops
 
 
 instance Binary ZInterface where
     get = undefined
-    -- put ZInterface{..} = putByteString ifname -- <> put ifindex <> put status <> put if_flags <> put metric <> put ifmtu <> put ifmtu6 <> put bandwidth <> put linkLayerType <> put hardwareAddress
     put ZInterface{..} = putByteString (pad 20 ifname) <> put ifindex <> put status <> put if_flags <> put metric <> put ifmtu <> put ifmtu6 <> put bandwidth <> put linkLayerType <> putCountedByteString hardwareAddress <> putWord8 0x00
 putCountedByteString bs = putWord32be (fromIntegral (BS.length bs)) <> putByteString bs
 pad n bs = BS.take n (BS.append bs (BS.replicate n 0x00))
@@ -113,20 +114,20 @@ pad n bs = BS.take n (BS.append bs (BS.replicate n 0x00))
 
 instance Binary ZRoute where
     get = undefined
-    -- put ZRoute{..} = put zrType <> put zrFlags <> put zrMsg <> put zrSafi <> putzvPrefix zrPrefix <> put zrNextHops <> put zrDistance <> put zrMetric <> put zrMtu <> put zrTag
     put ZRoute{..} =
         do
-        let zrMsg      = if null zrNextHops then 0 else bit _ZAPI_MESSAGE_NEXTHOP
+        let zrMsg      = if null zrNextHops then 0 else bit _ZAPI_MESSAGE_NEXTHOP :: Word8
             zrMsg'     = zrMsg      .|. if isJust zrDistance then bit _ZAPI_MESSAGE_DISTANCE else 0
             zrMsg''    = zrMsg'     .|. if isJust zrMetric then bit _ZAPI_MESSAGE_METRIC else 0
             zrMsg'''   = zrMsg''    .|. if isJust zrMtu then bit _ZAPI_MESSAGE_MTU else 0
             zrMsg''''  = zrMsg'''   .|. if isJust zrTag then bit _ZAPI_MESSAGE_TAG else 0
         put zrType <> put zrFlags <> put zrMsg'''' <> putRoutePrefixV4 zrPrefix
-        --when (not (null zrNextHops) (put zrNextHops)
-        --when (isJust zrDistance) (put zrDistance)
-        --when (isJust zrzrMetric) (put zrMetric)
-        --when (isJust zrMtu) (put zrMtu)
-        --when (isJust zrTag) (put zrTag)
+        when (not (null zrNextHops)) (put zrNextHops)
+        when (isJust zrDistance) (put $ fromJust zrDistance)
+        when (isJust zrMetric) (put $ fromJust zrMetric)
+        when (isJust zrMtu) (put $ fromJust zrMtu)
+        when (isJust zrTag) (put $ fromJust zrTag)
+
 
 {-
     zrNextHops <- if testBit zrMsg _ZAPI_MESSAGE_NEXTHOP then do nextHopCount <- anyWord8

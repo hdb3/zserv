@@ -58,7 +58,7 @@ verify' bs = do
     either (\errString -> putStrLn $ "decode failed for string " ++ toHex bs ++ " (" ++ errString ++ ")")
            (\rightZMsg -> do let bs' = encode' rightZMsg
                              if bs == bs' then putStrLn $ "OK (" ++ toHex bs ++ " = " ++ show rightZMsg ++ ")"
-                             else putStrLn $ "decode failed for string " ++ toHex bs ++ " /= " ++ toHex bs'  ++ " (" ++ show rightZMsg ++ ")")
+                             else putStrLn $ "encode failed for string \n" ++ toHex bs ++ " /= \n" ++ toHex bs'  ++ " (" ++ show rightZMsg ++ ")")
            ( zParser' bs )
     where encode' = L.toStrict . encode
 
