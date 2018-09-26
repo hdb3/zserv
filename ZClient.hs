@@ -10,18 +10,22 @@ import Data.Binary
 import Data.Binary.Get
 import qualified Data.ByteString.Lazy as L
 import qualified Data.ByteString
+import Text.Read
 
 import ZServ
 
 main :: IO ()
 main = do
     args <- getArgs
-    let target = read (args !! 0) :: IPv4
-        address = SockAddrInet 2600 (toHostAddress $ target)
-    print target
+    let s = args !! 0
+        (address,family) = maybe ((SockAddrUnix s, AF_UNIX))
+                           ( \target -> ( SockAddrInet 2600 (toHostAddress $ target),AF_INET))
+                           ( readMaybe s :: Maybe IPv4)
+   
+    print address
 
     putStrLn $ "connecting to: " ++ (show address)
-    sock <- socket AF_INET Stream defaultProtocol
+    sock <- socket family Stream defaultProtocol
     connect sock address
     putStrLn "connected"
     handle <- socketToHandle sock ReadWriteMode
@@ -29,7 +33,6 @@ main = do
     zStream <- parserToInputStream zMessageParser inputStream
     let enc zmsg = encode (ZMsgRaw 0 zmsg)
     L.hPut handle (enc (ZMHello 9))
-    L.hPut handle (enc ZMQRouterIdAdd)
     L.hPut handle (enc ZMQRouterIdAdd)
     L.hPut handle (enc ZMQInterfaceAdd)
     loop zStream where
