@@ -4,6 +4,7 @@ module ZMsgBinary where
 import Data.Binary
 import Data.Binary.Put
 import qualified Data.ByteString as BS
+import Data.ByteString.Lazy(toStrict)
 import Data.Word
 import Data.IP
 import Data.Bits
@@ -19,6 +20,12 @@ import ZSpec
 -- make all of the implicit put word16/32 explicit for endianess!!!
 
 -- Entry points / public interface
+
+instance Binary ZMsgRaw where
+    get = undefined
+    put (ZMsgRaw vrf zmsg) = putWord16be msgLen <> putWord8 0xff <> putWord8 0x03 <> putWord16be vrf <> putByteString zmsgBS
+        where zmsgBS = toStrict $ encode zmsg
+              msgLen = fromIntegral $ 6 + BS.length zmsgBS
 
 instance Binary ZMsg where
     get = undefined

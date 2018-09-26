@@ -4,6 +4,8 @@ import Data.ByteString
 import Data.Word
 import Data.IP
 
+data ZMsgRaw = ZMsgRaw Word16 ZMsg -- to support a wireformat encoder
+
 data ZMsg =   ZMHello Word8
             | ZMInterfaceAdd ZInterface
             | ZMQInterfaceAdd
