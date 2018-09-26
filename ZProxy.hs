@@ -50,14 +50,14 @@ proxy clientHandle server = do
     ( serverInput , serverOutput ) <- getStreams serverHandle
     ( clientInput , clientOutput ) <- getStreams clientHandle
 
-    forkIO $ loop (clientInput,serverOutput)
-    loop (serverInput,clientOutput)
+    forkIO $ loop "Client: " (clientInput,serverOutput)
+    loop "Server: "(serverInput,clientOutput)
     where
-    loop (inStr,outStr) = do
+    loop str (inStr,outStr) = do
         msg <- Streams.read inStr
-        maybe (do putStrLn "end of messages")
+        Streams.write msg outStr
+        maybe (do putStrLn $ str ++ "end of messages")
               ( \zMsg -> do 
-                              print zMsg
-                              Streams.write msg outStr
-                              loop (inStr,outStr) )
+                              putStrLn $ str ++ show zMsg
+                              loop str (inStr,outStr) )
               msg

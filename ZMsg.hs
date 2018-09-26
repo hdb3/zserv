@@ -81,7 +81,6 @@ data ZNextHop = ZNHBlackhole
 
 data ZRoute = ZRoute { zrType :: Word8
                      , zrFlags :: Word8
-                     , zrMsg :: Word8
                      , zrSafi :: Word16
                      , zrPrefix :: ZPrefix
                      , zrNextHops :: [ZNextHop]
