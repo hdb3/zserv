@@ -21,9 +21,6 @@ main = do
         (address,family) = maybe ((SockAddrUnix s, AF_UNIX))
                            ( \target -> ( SockAddrInet 2600 (toHostAddress $ target),AF_INET))
                            ( readMaybe s :: Maybe IPv4)
-   
-    print address
-
     putStrLn $ "connecting to: " ++ (show address)
     sock <- socket family Stream defaultProtocol
     connect sock address
@@ -31,10 +28,13 @@ main = do
     handle <- socketToHandle sock ReadWriteMode
     inputStream <- Streams.handleToInputStream handle
     zStream <- parserToInputStream zMessageParser inputStream
-    let enc zmsg = encode (ZMsgRaw 0 zmsg)
-    L.hPut handle (enc (ZMHello 9))
-    L.hPut handle (enc ZMQRouterIdAdd)
-    L.hPut handle (enc ZMQInterfaceAdd)
+    outputStream <- Streams.makeOutputStream $ \m -> case m of
+            Just zmsg -> L.hPut handle $ encode (ZMsgRaw 0 zmsg)
+            Nothing -> return () -- could close the handle/socket?
+    let put = (flip Streams.write) outputStream . Just
+    put (ZMHello 9)
+    put (ZMQRouterIdAdd)
+    put (ZMQInterfaceAdd)
     loop zStream where
     loop stream = do
         msg <- Streams.read stream
