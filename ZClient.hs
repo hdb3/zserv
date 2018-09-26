@@ -18,10 +18,10 @@ main :: IO ()
 main = do
     args <- getArgs
     let s = args !! 0
-        (address,family) = maybe ((SockAddrUnix s, AF_UNIX))
-                           ( \target -> ( SockAddrInet 2600 (toHostAddress $ target),AF_INET))
+        (address,family) = maybe (SockAddrUnix s, AF_UNIX)
+                           ( \target -> ( SockAddrInet 2600 (toHostAddress target),AF_INET))
                            ( readMaybe s :: Maybe IPv4)
-    putStrLn $ "connecting to: " ++ (show address)
+    putStrLn $ "connecting to: " ++ show address
     sock <- socket family Stream defaultProtocol
     connect sock address
     putStrLn "connected"
@@ -31,10 +31,10 @@ main = do
     outputStream <- Streams.makeOutputStream $ \m -> case m of
             Just zmsg -> L.hPut handle $ encode (ZMsgRaw 0 zmsg)
             Nothing -> return () -- could close the handle/socket?
-    let put = (flip Streams.write) outputStream . Just
+    let put = flip Streams.write outputStream . Just
     put (ZMHello 9)
-    put (ZMQRouterIdAdd)
-    put (ZMQInterfaceAdd)
+    put ZMQRouterIdAdd
+    put ZMQInterfaceAdd
     loop zStream where
     loop stream = do
         msg <- Streams.read stream

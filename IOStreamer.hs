@@ -19,11 +19,8 @@ main = do
         msg <- System.IO.Streams.read stream
         maybe (putStrLn "end of messages")
               ( \zMsg -> do 
-                              putStrLn $ show' zMsg
+                              print zMsg
                               -- putStrLn (identify $ decodeBgp $ L.fromStrict rawMsg)
                               loop stream )
                                              -- )
               msg
-
-show' (ZUnknown cmd payload) = "ZUnknown cmd: " ++ ( show cmd ) ++ " payload length: " ++ ( show $ Data.ByteString.length payload ) ++ "\n" ++ (toHex payload)
-show' x = show x 

@@ -63,14 +63,31 @@ zParser n' = do
    if | cmd == _ZEBRA_HELLO && n == 1 -> do protocol <- anyWord8
                                             return $ ZMHello protocol
 
+
       | cmd == _ZEBRA_INTERFACE_ADD ->
           if n == 0 then return ZMQInterfaceAdd
           else do interface <- zInterfaceParser n
                   return $ ZMInterfaceAdd interface
 
+      | cmd == _ZEBRA_INTERFACE_DELETE ->
+          do interface <- zInterfaceParser n
+             return $ ZMInterfaceDelete interface
+
       | cmd == _ZEBRA_INTERFACE_ADDRESS_ADD ->
           do zia <- zInterfaceAddressParser
              return $ ZMInterfaceAddressAdd zia
+
+      | cmd == _ZEBRA_INTERFACE_ADDRESS_DELETE ->
+          do zia <- zInterfaceAddressParser
+             return $ ZMInterfaceAddressDelete zia
+
+      | cmd == _ZEBRA_INTERFACE_UP ->
+          do interface <- zInterfaceParser n
+             return $ ZMInterfaceUp interface
+
+      | cmd == _ZEBRA_INTERFACE_DOWN ->
+          do interface <- zInterfaceParser n
+             return $ ZMInterfaceDown interface
 
       | cmd == _ZEBRA_ROUTER_ID_UPDATE && n == 6 ->
               do prefix <- zPrefix8Parser
@@ -100,7 +117,7 @@ zParser n' = do
 
       | otherwise -> do
             payload <- DAB.take n
-            return $ ZMUnknown cmd payload
+            return $ ZMUnknown cmd (HexByteString payload)
 
 -- this function duplicates much of the larger function used elesewhere....  ;-)
 -- however this one used when the number of nextHops is known in advance....

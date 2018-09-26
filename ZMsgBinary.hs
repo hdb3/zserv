@@ -36,11 +36,17 @@ instance Binary ZMsg where
     put ( ZMNextHopRegister reg ) = put _ZEBRA_NEXTHOP_REGISTER <> put reg
     put ( ZMNextHopUnregister reg ) = put _ZEBRA_NEXTHOP_UNREGISTER <> put reg
     put ( ZMInterfaceAdd interface ) = put _ZEBRA_INTERFACE_ADD <> put interface
+    put ( ZMInterfaceDelete interface ) = put _ZEBRA_INTERFACE_DELETE <> put interface
+    put ( ZMInterfaceUp interface ) = put _ZEBRA_INTERFACE_UP <> put interface
+    put ( ZMInterfaceDown interface ) = put _ZEBRA_INTERFACE_DOWN <> put interface
     put ( ZMInterfaceAddressAdd intAddr ) = put _ZEBRA_INTERFACE_ADDRESS_ADD <> put intAddr
+    put ( ZMInterfaceAddressDelete intAddr ) = put _ZEBRA_INTERFACE_ADDRESS_DELETE <> put intAddr
     put ( ZMIPV4RouteAdd route ) = put _ZEBRA_IPV4_ROUTE_ADD <> put route
     put ( ZMIPV4RouteDelete route ) = put _ZEBRA_IPV4_ROUTE_DELETE <> put route
     put ( ZMNextHopUpdate update ) = put _ZEBRA_NEXTHOP_UPDATE <> put update
-    put z = error $ "put ZMsg failed for ZMsg: " ++ show z 
+    put ( ZMUnknown cmd (HexByteString bs) ) = put cmd <> putByteString bs
+    -- put z = error $ "put ZMsg failed for ZMsg: " ++ show z 
+    -- the ZMUnknown encoder mask gaps which might be interesting to capture via exception
 
 -- **********************************************************************************
 

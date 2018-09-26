@@ -10,5 +10,5 @@ main = do
     file <- BS.hGetContents stdin
     let zmsgs = parseOnly zRawFlowParser file
     either putStrLn
-           ( mapM_ ( \(cmd,pl) -> putStrLn $ "cmd " ++ show cmd ++ " len " ++ show (BS.length pl) ++ " : " ++ (toHex pl) ))
+           ( mapM_ ( \(cmd,pl) -> putStrLn $ "cmd " ++ show cmd ++ " len " ++ show (BS.length pl) ++ " : " ++ toHex pl ))
            zmsgs

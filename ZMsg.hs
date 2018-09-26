@@ -3,13 +3,19 @@ module ZMsg where
 import Data.ByteString
 import Data.Word
 import Data.IP
+import Debug
+
 
 data ZMsgRaw = ZMsgRaw Word16 ZMsg -- to support a wireformat encoder
 
 data ZMsg =   ZMHello Word8
             | ZMInterfaceAdd ZInterface
+            | ZMInterfaceDelete ZInterface
             | ZMQInterfaceAdd
             | ZMInterfaceAddressAdd ZInterfaceAddress
+            | ZMInterfaceAddressDelete ZInterfaceAddress
+            | ZMInterfaceUp ZInterface
+            | ZMInterfaceDown ZInterface
             | ZMRouterIDUpdate ZPrefix
             | ZMIPV4RouteDelete ZRoute
             | ZMIPV4RouteAdd ZRoute
@@ -18,8 +24,12 @@ data ZMsg =   ZMHello Word8
             | ZMNextHopUnregister ZNextHopRegister
             | ZMQRouterIdAdd
             -- | ZMRouterIdAdd
-            | ZMUnknown { cmd :: Word16 , payload :: ByteString
+            | ZMUnknown { cmd :: Word16 , payload :: HexByteString
             } deriving (Eq,Show,Read)
+
+newtype HexByteString = HexByteString ByteString deriving (Eq,Read)
+instance Show HexByteString where
+    show (HexByteString bs) = toHex bs
 
 data ZNextHopRegister = ZNextHopRegister { connected :: Bool
                                          , prefix :: ZPrefix
