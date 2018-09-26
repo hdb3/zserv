@@ -212,7 +212,8 @@ zInterfaceParser n = do
     bandwidth <- anyWord32be
     linkLayerType <- anyWord32be
     hardwareAddressLength <- anyWord32be
-    hardwareAddress <- DAB.take (fromIntegral hardwareAddressLength)
+    hardwareAddress' <- DAB.take (fromIntegral hardwareAddressLength)
+    let hardwareAddress = HexByteString hardwareAddress'
     word8 0x00
     return $ --assert (n == 58 + fromIntegral hardwareAddressLength)
              ZInterface {..} 

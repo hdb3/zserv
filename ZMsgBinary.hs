@@ -121,7 +121,7 @@ instance Binary ZNextHopUpdate where
 instance Binary ZInterface where
     get = undefined
     put ZInterface{..} = putByteString (pad 20 ifname) <> put ifindex <> put status <> put ifFlags <> put metric <> put ifmtu <> put ifmtu6 <> put bandwidth <> put linkLayerType <> putCountedByteString hardwareAddress <> putWord8 0x00
-putCountedByteString bs = putWord32be (fromIntegral (BS.length bs)) <> putByteString bs
+putCountedByteString (HexByteString bs) = putWord32be (fromIntegral (BS.length bs)) <> putByteString bs
 pad n bs = BS.take n (BS.append bs (BS.replicate n 0x00))
 
 

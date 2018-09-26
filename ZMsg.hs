@@ -59,7 +59,7 @@ data ZInterface = ZInterface { ifname :: ByteString
                              , ifmtu6 :: Word32
                              , bandwidth :: Word32
                              , linkLayerType :: Word32
-                             , hardwareAddress :: ByteString
+                             , hardwareAddress :: HexByteString
                              -- there is a placeholder here for 'link params'
                              -- which is for TE - but it is really longwinded so won't bother doing it now
                              } deriving (Eq,Show,Read)
