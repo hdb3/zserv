@@ -5,12 +5,11 @@ import Data.Binary
 import Data.Binary.Put
 import qualified Data.ByteString as BS
 import Data.ByteString.Lazy(toStrict)
-import Data.Word
 import Data.IP
 import Data.Bits
 import Data.Monoid((<>))
-import Data.Maybe(isJust,fromJust)
-import Control.Monad(when)
+import Data.Maybe(isJust)
+import Control.Monad(unless)
 import Data.Foldable(forM_)
 
 import ZMsg
@@ -74,6 +73,7 @@ putZPrefix8 ZPrefixV4{..} = put _AF_INET  <> put v4address <> put plen
 putZPrefix8 ZPrefixV6{..} = put _AF_INET6 <> put v6address <> put plen
 
 -- placeholder for fixing ZRoute to hold v4 and v6...
+putzvPrefix ZPrefixV6{..} = undefined
 putzvPrefix ZPrefixV4{..} = do
     put plen
     let address = byteSwap32 $ toHostAddress v4address
@@ -85,6 +85,7 @@ putzvPrefix ZPrefixV4{..} = do
        | plen < 33  -> put v4address
        | otherwise -> error $ "putzvPrefix: invalid plen - " ++ show plen
 
+putRoutePrefixV4 ZPrefixV6{..} = undefined -- TODO
 putRoutePrefixV4 pfx@ZPrefixV4{..} = putWord16be 0x01 <> -- 'SAFI' for IPv4!?
                                  putzvPrefix pfx 
 
@@ -103,9 +104,9 @@ instance Binary ZNextHop where
     put ( ZNHIPv4 ip) = put _ZEBRA_NEXTHOP_IPV4 <> put ip
     put ( ZNHIfindex ifindex) = put _ZEBRA_NEXTHOP_IFINDEX <> put ifindex
     --TODO .....
-    -- ZNHIPv4Ifindex IPv4 Word32
-    -- ZNHIPv6 IPv6
-    -- ZNHIPv6Ifindex IPv6 Word32
+    put ( ZNHIPv4Ifindex _ _) = undefined
+    put ( ZNHIPv6 _ ) = undefined
+    put ( ZNHIPv6Ifindex _ _) = undefined
 
 
 instance Binary ZNextHopRegister where
@@ -135,7 +136,7 @@ instance Binary ZRoute where
             zrMsg'''   = zrMsg''    .|. if isJust zrMtu then bit _ZAPI_MESSAGE_MTU else 0
             zrMsg''''  = zrMsg'''   .|. if isJust zrTag then bit _ZAPI_MESSAGE_TAG else 0
         put zrType <> put zrFlags <> put zrMsg'''' <> putRoutePrefixV4 zrPrefix
-        when (not (null zrNextHops)) (put zrNextHops)
+        unless (null zrNextHops) (put zrNextHops)
         forM_ zrDistance put
         forM_ zrMetric put
         forM_ zrMtu put

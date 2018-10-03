@@ -6,7 +6,6 @@ import qualified Data.Attoparsec.ByteString as DAB
 import Data.Attoparsec.Binary -- from package attoparsec-binary
 import Control.Applicative
 import Control.Monad(when)
-import Control.Exception -- only if assert is used...
 import Data.IP
 import Data.Bits
 import Data.Word
@@ -66,11 +65,11 @@ zParser n' = do
 
       | cmd == _ZEBRA_INTERFACE_ADD ->
           if n == 0 then return ZMQInterfaceAdd
-          else do interface <- zInterfaceParser n
+          else do interface <- zInterfaceParser
                   return $ ZMInterfaceAdd interface
 
       | cmd == _ZEBRA_INTERFACE_DELETE ->
-          do interface <- zInterfaceParser n
+          do interface <- zInterfaceParser
              return $ ZMInterfaceDelete interface
 
       | cmd == _ZEBRA_INTERFACE_ADDRESS_ADD ->
@@ -82,11 +81,11 @@ zParser n' = do
              return $ ZMInterfaceAddressDelete zia
 
       | cmd == _ZEBRA_INTERFACE_UP ->
-          do interface <- zInterfaceParser n
+          do interface <- zInterfaceParser
              return $ ZMInterfaceUp interface
 
       | cmd == _ZEBRA_INTERFACE_DOWN ->
-          do interface <- zInterfaceParser n
+          do interface <- zInterfaceParser
              return $ ZMInterfaceDown interface
 
       | cmd == _ZEBRA_ROUTER_ID_UPDATE && n == 6 ->
@@ -94,11 +93,11 @@ zParser n' = do
                  return $ ZMRouterIDUpdate prefix
 
       | cmd == _ZEBRA_IPV4_ROUTE_ADD ->
-          do route <- zRouteParser n
+          do route <- zRouteParser
              return $ ZMIPV4RouteAdd route
 
       | cmd == _ZEBRA_IPV4_ROUTE_DELETE ->
-          do route <- zRouteParser n
+          do route <- zRouteParser
              return $ ZMIPV4RouteDelete route
 
       | cmd == _ZEBRA_NEXTHOP_REGISTER ->
@@ -181,8 +180,8 @@ zIPv6Parser = do
     v6address <- DAB.take 16
     return $ (toIPv6b . map fromIntegral . BS.unpack) v6address
 
-zRouteParser :: Int -> Parser ZRoute
-zRouteParser n = do
+zRouteParser :: Parser ZRoute
+zRouteParser = do
     zrType <- anyWord8
     zrFlags <- anyWord8
     zrMsg <- anyWord8
@@ -199,8 +198,8 @@ zRouteParser n = do
 
 -- refer to zclient.c for the specification of this structure
 
-zInterfaceParser :: Int -> Parser ZInterface
-zInterfaceParser n = do
+zInterfaceParser :: Parser ZInterface
+zInterfaceParser = do
     ifname' <- DAB.take 20
     let ifname = BS.takeWhile ( 0 /= ) ifname'
     ifindex <- anyWord32be 
@@ -215,8 +214,7 @@ zInterfaceParser n = do
     hardwareAddress' <- DAB.take (fromIntegral hardwareAddressLength)
     let hardwareAddress = HexByteString hardwareAddress'
     word8 0x00
-    return $ --assert (n == 58 + fromIntegral hardwareAddressLength)
-             ZInterface {..} 
+    return ZInterface {..} 
 
 -- Prefix parsers
 --

@@ -56,7 +56,7 @@ proxy clientHandle server = do
     loop str (inStr,outStr) = do
         msg <- Streams.read inStr
         Streams.write msg outStr
-        maybe (do putStrLn $ str ++ "end of messages")
+        maybe (putStrLn $ str ++ "end of messages")
               ( \zMsg -> do 
                               putStrLn $ str ++ show zMsg
                               loop str (inStr,outStr) )

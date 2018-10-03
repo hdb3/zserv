@@ -1,17 +1,11 @@
-{-#LANGUAGE RecordWildCards, OverloadedStrings #-}
+{-#LANGUAGE OverloadedStrings #-}
 module Main where
 import System.Environment
-import Network.Socket
 import System.IO
 import Data.IP
 import Control.Monad(unless)
 import Control.Concurrent
 import qualified System.IO.Streams as Streams
-import System.IO.Streams.Attoparsec.ByteString
-import Data.Binary
-import Data.Binary.Get
-import qualified Data.ByteString.Lazy as L
-import qualified Data.ByteString
 import Text.Read
 
 import ZServ
@@ -20,27 +14,17 @@ main :: IO ()
 main = do
     args <- getArgs
     let s = args !! 0
-        (address,family) = maybe (SockAddrUnix s, AF_UNIX)
-                           ( \target -> ( SockAddrInet 2600 (toHostAddress target),AF_INET))
-                           ( readMaybe s :: Maybe IPv4)
-    putStrLn $ "connecting to: " ++ show address
-    sock <- socket family Stream defaultProtocol
-    connect sock address
+    (inputStream,outputStream) <- 
+        maybe ( getZStreamUnix s )
+              getZStreamInet
+              ( readMaybe s :: Maybe IPv4)
+
     putStrLn "connected"
-    handle <- socketToHandle sock ReadWriteMode
-    inputStream <- Streams.handleToInputStream handle
-    zStream <- parserToInputStream zMessageParser inputStream
-    outputStream <- Streams.makeOutputStream $ \m -> case m of
-            Just zmsg -> L.hPut handle $ encode (ZMsgRaw 0 zmsg)
-            Nothing -> return () -- could close the handle/socket?
-    let put = flip Streams.write outputStream . Just
-    put (ZMHello 9)
-    put ZMQRouterIdAdd
-    put ZMQInterfaceAdd
-    -- forkIO (console put)
-    -- loop zStream where
-    forkIO (loop zStream)
-    console put
+    zservRegister outputStream _ZEBRA_ROUTE_BGP
+    zservRequestRouterId outputStream
+    zservRequestInterface outputStream
+    forkIO (loop inputStream)
+    console outputStream
     where
     loop stream = do
         msg <- Streams.read stream
@@ -50,50 +34,34 @@ main = do
                               loop stream )
               msg
 
-console put = do
+console outputStream = do
     prompt
     input <- getLine
     let (command,p1,p2) = parseInput input
     case command of
-        'a' -> maybe (do putStrLn "couldn't parse a route")
-                     (\route -> maybe ( putStrLn "couldn't parse a next-hop")
-                                      ( addRoute put route )
+        'a' -> maybe (putStrLn "couldn't parse a route")
+                     (\prefix -> maybe ( putStrLn "couldn't parse a next-hop")
+                                      ( \nextHop  -> do putStrLn $ "add " ++ show prefix ++ " via " ++ show nextHop
+                                                        addRoute outputStream prefix nextHop )
                                       (parseAddress p2))
                      (parsePrefix p1)
 
-        'd' -> maybe (do putStrLn "couldn't parse a route")
-                     (delRoute put)
+        'd' -> maybe (putStrLn "couldn't parse a route")
+                     (\prefix -> do putStrLn $ "del " ++ show prefix
+                                    delRoute outputStream prefix )
                      (parsePrefix p1)
+
         'q' -> putStrLn "goodbye"
         'z' -> putStrLn "say hello, wave goodbye"
-        otherwise -> (do putStrLn "couldn't parse a command")
+        _ -> putStrLn "couldn't parse a command"
 
-    unless (command == 'q') (console put)
-    where prompt = hPutStr stdout ">>> " >> hFlush stdout
+    unless (command == 'q') (console outputStream)
+
+    where prompt = putStr ">>> " >> hFlush stdout
           parseInput = parseInput' . words
           parseInput' wx | null wx = (' ',"","")
                          | otherwise  = (head (wx !! 0) , wx !! 1, wx !! 2)
           parsePrefix s = readMaybe s :: Maybe (AddrRange IPv4)
-          -- parsePrefix s = readMaybe s :: Maybe IPRange
           parseAddress s  = readMaybe s :: Maybe IPv4
-          addRoute put pfx nh = let route = routeBase { zrPrefix = fromIPv4Range pfx, zrNextHops = [ZNHIPv4 nh] }
-              in do putStrLn $ "add " ++ show ( ZMIPV4RouteAdd route) 
-                    put $ ZMIPV4RouteAdd route 
-          delRoute put pfx = let route = routeBase { zrPrefix = fromIPv4Range pfx }
-              in do putStrLn $ "del " ++ show ( ZMIPV4RouteDelete route) 
-                    put $ ZMIPV4RouteDelete route 
 
-          -- fromIPv4Range  ZPrefixV4{..} = makeAddrRange v4address (fromIntegral plen) 
-          fromIPv4Range ipv4range = let (v4address, plen') = addrRangePair ipv4range 
-                                        plen = fromIntegral plen' in ZPrefixV4{..}
 
-          routeBase = ZRoute { zrType = 9
-                             , zrFlags = 9
-                             , zrSafi = 1
-                             , zrPrefix = undefined
-                             , zrNextHops = []
-                             , zrDistance = Nothing
-                             , zrMetric = Nothing
-                             , zrMtu = Nothing
-                             , zrTag = Nothing
-                             }
