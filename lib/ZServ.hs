@@ -54,3 +54,11 @@ delRoute stream pfx = let route = routeBase { zrPrefix = fromIPv4Range pfx }
 zservRegister stream protocol = Streams.write (Just $ ZMHello protocol ) stream
 zservRequestRouterId = Streams.write (Just ZMQRouterIdAdd )
 zservRequestInterface = Streams.write (Just ZMQInterfaceAdd )
+
+
+zservReadLoop stream = do
+    msg <- Streams.read stream
+    maybe (putStrLn "end of messages")
+          ( \zMsg -> do print zMsg
+                        zservReadLoop stream )
+          msg
