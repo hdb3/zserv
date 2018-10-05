@@ -40,6 +40,11 @@ create the state file: /var/run/quagga
 mkdir /var/run/quagga
 chown quagga:quagga /var/run/quagga
 
+NB: this can be automated at boot time (because /run is likely tmpfs...), with this file:
+
+/usr/lib/tmpfiles.d/zebra.conf:
+d /run/quagga 0755 quagga quagga -
+
 create a bare zebra config file:(zebra.conf)
 
     hostname Router
