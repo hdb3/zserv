@@ -6,7 +6,7 @@ clone quagga : git clone git://git.savannah.nongnu.org/quagga.git -b 1.2.4 ???
 or download: http://download.savannah.gnu.org/releases/quagga/
 
 deps: autoconf automake libtool make gawk libreadline-dev  libc-ares-dev texinfo dejagnu  groff libsnmp-dev  libcap-dev texi2html pkg-config
-configure: ./configure --sysconfdir=/etc --localstatedir=/var/run/quagga
+configure: ./configure --sysconfdir=/etc/quagga --localstatedir=/var/run/quagga
 
 use the debian recipe to create the quagga user 
 
