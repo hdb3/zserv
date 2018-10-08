@@ -1,4 +1,4 @@
-{-#LANGUAGE RecordWildCards, OverloadedStrings #-}
+{-#LANGUAGE DuplicateRecordFields, RecordWildCards, OverloadedStrings #-}
 module ZServ (module ZServ, module ZMsg, module ZMsgBinary, module ZSpec, module WireFormat, module Debug) where
 -- consider exporting some functions from System.IO.Streams, (as Streams?)
 
@@ -47,10 +47,10 @@ routeBase = ZRoute { zrType = 9
                    , zrTag = Nothing
                    }
 
-addRoute stream pfx nh = let route = routeBase { zrPrefix = fromIPv4Range pfx, zrNextHops = [ZNHIPv4 nh] }
+addRoute stream pfx nh = let route = routeBase { zrPrefix = fromIPv4Range pfx, zrNextHops = [ZNHIPv4 nh] } :: ZRoute
                          in Streams.write (Just $ ZMIPV4RouteAdd route ) stream
 
-delRoute stream pfx = let route = routeBase { zrPrefix = fromIPv4Range pfx }
+delRoute stream pfx = let route = routeBase { zrPrefix = fromIPv4Range pfx } :: ZRoute
                          in Streams.write (Just $ ZMIPV4RouteDelete route ) stream
 
 zservRegister stream protocol = Streams.write (Just $ ZMHello protocol ) stream
