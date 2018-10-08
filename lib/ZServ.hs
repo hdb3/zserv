@@ -58,6 +58,14 @@ delRoute stream pfx = let route = routeBase { zrPrefix = fromIPv4Range pfx } :: 
 zservRegister stream protocol = Streams.write (Just $ ZMHello protocol ) stream
 zservRequestRouterId = Streams.write (Just ZMQRouterIdAdd )
 zservRequestInterface = Streams.write (Just ZMQInterfaceAdd )
+zservRequestRedistributeSystem = Streams.write (Just $ ZMRedistributeAdd _ZEBRA_ROUTE_SYSTEM )
+zservRequestRedistributeKernel = Streams.write (Just $ ZMRedistributeAdd _ZEBRA_ROUTE_KERNEL )
+zservRequestRedistributeConnected = Streams.write (Just $ ZMRedistributeAdd _ZEBRA_ROUTE_CONNECT)
+zservRequestRedistributeStatic = Streams.write (Just $ ZMRedistributeAdd _ZEBRA_ROUTE_STATIC )
+zservRequestRedistributeAll stream = zservRequestRedistributeSystem stream
+                                   >> zservRequestRedistributeKernel stream
+                                   >> zservRequestRedistributeConnected stream
+                                   >> zservRequestRedistributeStatic stream
 
 
 zservReadLoop stream = do

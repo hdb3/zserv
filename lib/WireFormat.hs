@@ -109,8 +109,10 @@ zParser role n' = do
                                      return $ ZMIPV4ServerRouteAdd route
 
       | cmd == _ZEBRA_IPV4_ROUTE_DELETE ->
-          do route <- zRouteParser
-             return $ ZMIPV4RouteDelete route
+          case role of ZClient -> do route <- zRouteParser
+                                     return $ ZMIPV4RouteDelete route
+                       ZServer -> do route <- zServerRouteParser
+                                     return $ ZMIPV4ServerRouteDelete route
 
       | cmd == _ZEBRA_REDISTRIBUTE_ADD ->
           do routeType <- anyWord8
