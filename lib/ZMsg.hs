@@ -19,6 +19,10 @@ data ZMsg =   ZMHello Word8
             | ZMRouterIDUpdate ZPrefix
             | ZMIPV4RouteDelete ZRoute
             | ZMIPV4RouteAdd ZRoute
+            | ZMRedistributeAdd Word8
+            | ZMRedistributeDelete Word8
+            | ZMRedistributeDefaultAdd
+            | ZMRedistributeDefaultDelete
             | ZMNextHopUpdate ZNextHopUpdate
             | ZMNextHopRegister ZNextHopRegister
             | ZMNextHopUnregister ZNextHopRegister
@@ -78,6 +82,20 @@ data ZNextHop = ZNHBlackhole
               | ZNHIPv6 IPv6
               | ZNHIPv6Ifindex IPv6 Word32
                 deriving (Eq,Show,Read)
+
+-- ZServRoute exists because the protocol is not symmetric between client and server
+-- when zserv sends routes it does it differently
+data ZServRoute = ZServRoute { zrType :: Word8
+                     , zrFlags :: Word8
+                     -- , zrSafi :: Word16
+                     , zrPrefix :: ZPrefix
+                     , zrNextHops :: [ZNextHop]
+                     , zrDistance :: Maybe Word8
+                     , zrMetric :: Maybe Word32
+                     , zrMtu :: Maybe Word32
+                     , zrTag :: Maybe Word32
+                     } deriving (Eq,Show,Read)
+
 
 data ZRoute = ZRoute { zrType :: Word8
                      , zrFlags :: Word8

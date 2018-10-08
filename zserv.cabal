@@ -2,7 +2,7 @@
 --  see http://haskell.org/cabal/users-guide/
 
 name:                zserv
-version:             1.0.0.4
+version:             1.0.1.0
 synopsis:            Haskell implementation of the zebra routing daemon API
 -- description:         
 homepage:            https://github.com/hdb3/zserv

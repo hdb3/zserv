@@ -1,5 +1,7 @@
 {-#LANGUAGE RecordWildCards, OverloadedStrings #-}
 module ZServ (module ZServ, module ZMsg, module ZMsgBinary, module ZSpec, module WireFormat, module Debug) where
+-- consider exporting some functions from System.IO.Streams, (as Streams?)
+
 import ZMsg
 import Debug
 import ZSpec

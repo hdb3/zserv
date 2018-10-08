@@ -32,6 +32,14 @@ main = do
         forkIO $ proxy handle s
 
 
+getRawStreams handle = do
+    inputStream <- Streams.handleToInputStream handle
+    inStream <- parserToInputStream zDumbParser inputStream
+    outStream <- Streams.makeOutputStream $ \m -> case m of
+            Just zmsg -> L.hPut handle $ encodeRawZMsg zmsg
+            Nothing -> return () -- could close the handle/socket?
+    return (inStream, outStream)
+
 getStreams handle = do
     inputStream <- Streams.handleToInputStream handle
     inStream <- parserToInputStream zMessageParser inputStream
@@ -47,8 +55,8 @@ proxy clientHandle server = do
     serverHandle <- socketToHandle sock ReadWriteMode
     putStrLn "server connected"
 
-    ( serverInput , serverOutput ) <- getStreams serverHandle
-    ( clientInput , clientOutput ) <- getStreams clientHandle
+    ( serverInput , serverOutput ) <- getRawStreams serverHandle
+    ( clientInput , clientOutput ) <- getRawStreams clientHandle
 
     forkIO $ loop "Client: " (clientInput,serverOutput)
     loop "Server: "(serverInput,clientOutput)
@@ -58,6 +66,6 @@ proxy clientHandle server = do
         Streams.write msg outStr
         maybe (putStrLn $ str ++ "end of messages")
               ( \zMsg -> do 
-                              putStrLn $ str ++ show zMsg
+                              putStrLn $ str ++ toHex zMsg
                               loop str (inStr,outStr) )
               msg

@@ -4,7 +4,7 @@ module ZMsgBinary where
 import Data.Binary
 import Data.Binary.Put
 import qualified Data.ByteString as BS
-import Data.ByteString.Lazy(toStrict)
+import qualified Data.ByteString.Lazy as L
 import Data.IP
 import Data.Bits
 import Data.Monoid((<>))
@@ -20,11 +20,19 @@ import ZSpec
 
 -- Entry points / public interface
 
+encodeRawZMsg :: BS.ByteString -> L.ByteString
+encodeRawZMsg = runPut . putRawZMsg
+
+putRawZMsg :: BS.ByteString -> Put
+putRawZMsg zmsg = putWord16be msgLen <> putWord8 0xff <> putWord8 0x03 <> putWord16be 0x0000 <> putByteString zmsg
+        where msgLen = fromIntegral $ 6 + BS.length zmsg
+
 instance Binary ZMsgRaw where
     get = undefined
     put (ZMsgRaw vrf zmsg) = putWord16be msgLen <> putWord8 0xff <> putWord8 0x03 <> putWord16be vrf <> putByteString zmsgBS
-        where zmsgBS = toStrict $ encode zmsg
+        where zmsgBS = L.toStrict $ encode zmsg
               msgLen = fromIntegral $ 6 + BS.length zmsgBS
+
 
 instance Binary ZMsg where
     get = undefined
@@ -42,6 +50,10 @@ instance Binary ZMsg where
     put ( ZMInterfaceAddressDelete intAddr ) = put _ZEBRA_INTERFACE_ADDRESS_DELETE <> put intAddr
     put ( ZMIPV4RouteAdd route ) = put _ZEBRA_IPV4_ROUTE_ADD <> put route
     put ( ZMIPV4RouteDelete route ) = put _ZEBRA_IPV4_ROUTE_DELETE <> put route
+    put ( ZMRedistributeAdd routeType ) = put _ZEBRA_REDISTRIBUTE_ADD <> put routeType
+    put ( ZMRedistributeDelete routeType ) = put _ZEBRA_REDISTRIBUTE_DELETE <> put routeType
+    put ( ZMRedistributeDefaultAdd ) = put _ZEBRA_REDISTRIBUTE_DEFAULT_ADD
+    put ( _ZEBRA_REDISTRIBUTE_DEFAULT_DELETE ) = put _ZEBRA_REDISTRIBUTE_DEFAULT_ADD
     put ( ZMNextHopUpdate update ) = put _ZEBRA_NEXTHOP_UPDATE <> put update
     put ( ZMUnknown cmd (HexByteString bs) ) = put cmd <> putByteString bs
     -- put z = error $ "put ZMsg failed for ZMsg: " ++ show z 
@@ -103,8 +115,8 @@ instance Binary ZNextHop where
     put ZNHBlackhole = put _ZEBRA_NEXTHOP_BLACKHOLE
     put ( ZNHIPv4 ip) = put _ZEBRA_NEXTHOP_IPV4 <> put ip
     put ( ZNHIfindex ifindex) = put _ZEBRA_NEXTHOP_IFINDEX <> put ifindex
+    put ( ZNHIPv4Ifindex ipv4 ifindex) = put _ZEBRA_NEXTHOP_IPV4_IFINDEX <> put ipv4 <> put ifindex
     --TODO .....
-    put ( ZNHIPv4Ifindex _ _) = undefined
     put ( ZNHIPv6 _ ) = undefined
     put ( ZNHIPv6Ifindex _ _) = undefined
 

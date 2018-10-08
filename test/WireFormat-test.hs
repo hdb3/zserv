@@ -14,16 +14,14 @@ import Data.Word
 import Data.Char
 import Data.Binary
 
-import Debug
-import ZMsg
-import ZMsgBinary
-import ZSpec
-import WireFormat
+import ZServ
 
 main = do
+    verify "000701101f0001c0a82c010100000038000000000000000000"
+    verify "000701101f200102030401c0a87aec0100000003000000000000000000"
     -- screenClear
     -- verify "00080909080001180c000100000000"
-    verifyFlowFile "flow5"
+    -- verifyFlowFile "flow5"
     -- print' $ parse' zParser "000165746830000000000000000000000000000000000000000205000000000001104300000000000005dc000005dc0000000000000001000000065254008d177f00"
     -- parseFlowFile "flow1"
     -- verify "001b00000220c0a87a01"           -- ZMNextHopRegister

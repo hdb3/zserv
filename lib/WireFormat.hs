@@ -24,7 +24,7 @@ zRawMessageParser = do
     msgLen <- anyWord16be
     word8 0xff
     word8 0x03
-    word16be 0x0000
+    word16be 0x0000 -- VRF ID
     when (msgLen > 4096 || msgLen < 8) ( fail "invalid message length")
     -- cmd <- anyWord16be
     -- pl <- DAB.take (fromIntegral msgLen - 8)
@@ -35,6 +35,16 @@ zRawMessageParser = do
     pl <- DAB.take (fromIntegral msgLen - 8)
     return (cmd,BS.append cmdBS pl)
 
+-- This is for a dumb passthrough stream
+zDumbParser :: Parser (Maybe BS.ByteString)
+zDumbParser = do
+    msgLen <- anyWord16be
+    word8 0xff
+    word8 0x03
+    word16be 0x0000 -- VRF ID
+    when (msgLen > 4096 || msgLen < 8) ( fail "invalid message length")
+    pl <- DAB.take (fromIntegral msgLen - 6)
+    return (Just pl)
 
 zMessageParser :: Parser (Maybe ZMsg)
 zMessageParser = ( zMessageParser'' <|> return Nothing ) <?> "zserv wire format parser"
@@ -100,6 +110,22 @@ zParser n' = do
           do route <- zRouteParser
              return $ ZMIPV4RouteDelete route
 
+      | cmd == _ZEBRA_REDISTRIBUTE_ADD ->
+          do routeType <- anyWord8
+             return $ ZMRedistributeAdd routeType
+
+      | cmd == _ZEBRA_REDISTRIBUTE_DELETE ->
+          do routeType <- anyWord8
+             return $ ZMRedistributeDelete routeType
+
+      | cmd == _ZEBRA_REDISTRIBUTE_DEFAULT_ADD ->
+          do -- routeType <- anyWord8
+             return $ ZMRedistributeDefaultAdd
+
+      | cmd == _ZEBRA_REDISTRIBUTE_DEFAULT_DELETE ->
+          do -- routeType <- anyWord8
+             return $ ZMRedistributeDefaultDelete
+
       | cmd == _ZEBRA_NEXTHOP_REGISTER ->
           do reg <- zNextHopRegisterParser
              return $ ZMNextHopRegister reg
@@ -118,8 +144,16 @@ zParser n' = do
             payload <- DAB.take n
             return $ ZMUnknown cmd (HexByteString payload)
 
--- this function duplicates much of the larger function used elesewhere....  ;-)
--- however this one used when the number of nextHops is known in advance....
+-- zRouteNextHopParser - specialised from zNextHopParser for use in zRouteParser
+-- in this message version the format is hardwired (address+ifindex) and each hop has a dummy NH count byte preceding
+
+zRouteNextHopParser :: Parser ZNextHop
+zRouteNextHopParser = do
+    _ <- anyWord8
+    ipv4 <- zIPv4
+    w32 <- anyWord32be
+    return $ ZNHIPv4Ifindex ipv4 w32
+
 zNextHopParser :: Parser ZNextHop
 zNextHopParser = do
     nextHopType <- anyWord8
@@ -179,6 +213,27 @@ zIPv6Parser :: Parser IPv6
 zIPv6Parser = do
     v6address <- DAB.take 16
     return $ (toIPv6b . map fromIntegral . BS.unpack) v6address
+
+-- 2018/10/08 - fixing up this function
+--            - I'm not clear if this is/was used elsewhere/before
+--            - BUT - it is not currently correct/consistent with zebra/zserv.c
+--            - the changes now being made
+
+zServRouteParser :: Parser ZServRoute
+zServRouteParser = do
+    zrType <- anyWord8
+    zrFlags <- anyWord8
+    zrMsg <- anyWord8
+    -- for zserv -> client there is no SAFI filed it seems...
+    zrPrefix <-  zvPrefixIPv4Parser
+    zrNextHops <- if testBit zrMsg _ZAPI_MESSAGE_NEXTHOP then do nextHopCount <- peekWord8' -- not sure if the route delete message will be parsed like this..
+                                                                 count (fromIntegral nextHopCount) zRouteNextHopParser
+                                                         else return []
+    zrDistance <- if testBit zrMsg _ZAPI_MESSAGE_DISTANCE then fmap Just anyWord8 else return Nothing
+    zrMetric <- if testBit zrMsg _ZAPI_MESSAGE_METRIC then fmap Just anyWord32be else return Nothing
+    zrMtu <- if testBit zrMsg _ZAPI_MESSAGE_MTU then fmap Just anyWord32be else return Nothing
+    zrTag <- if testBit zrMsg _ZAPI_MESSAGE_TAG then fmap Just anyWord32be else return Nothing
+    return ZServRoute{..}
 
 zRouteParser :: Parser ZRoute
 zRouteParser = do
