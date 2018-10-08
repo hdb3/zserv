@@ -8,6 +8,8 @@ import Debug
 
 data ZMsgRaw = ZMsgRaw Word16 ZMsg -- to support a wireformat encoder
 
+data ZRole = ZClient | ZServer
+
 data ZMsg =   ZMHello Word8
             | ZMInterfaceAdd ZInterface
             | ZMInterfaceDelete ZInterface
@@ -19,6 +21,8 @@ data ZMsg =   ZMHello Word8
             | ZMRouterIDUpdate ZPrefix
             | ZMIPV4RouteDelete ZRoute
             | ZMIPV4RouteAdd ZRoute
+            | ZMIPV4ServerRouteDelete ZServerRoute
+            | ZMIPV4ServerRouteAdd ZServerRoute
             | ZMRedistributeAdd Word8
             | ZMRedistributeDelete Word8
             | ZMRedistributeDefaultAdd
@@ -100,6 +104,17 @@ data ZServRoute = ZServRoute { zrType :: Word8
 data ZRoute = ZRoute { zrType :: Word8
                      , zrFlags :: Word8
                      , zrSafi :: Word16
+                     , zrPrefix :: ZPrefix
+                     , zrNextHops :: [ZNextHop]
+                     , zrDistance :: Maybe Word8
+                     , zrMetric :: Maybe Word32
+                     , zrMtu :: Maybe Word32
+                     , zrTag :: Maybe Word32
+                     } deriving (Eq,Show,Read)
+
+data ZServerRoute = ZServerRoute { zrType :: Word8
+                     , zrFlags :: Word8
+                     -- , zrSafi :: Word16
                      , zrPrefix :: ZPrefix
                      , zrNextHops :: [ZNextHop]
                      , zrDistance :: Maybe Word8

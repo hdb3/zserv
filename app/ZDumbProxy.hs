@@ -2,14 +2,9 @@ module Main where
 import System.Environment
 import Network.Socket
 import System.IO
-import Data.IP
 import qualified System.IO.Streams as Streams
 import System.IO.Streams.Attoparsec.ByteString
-import Data.Binary
-import Data.Binary.Get
 import qualified Data.ByteString.Lazy as L
-import qualified Data.ByteString
-import Text.Read
 import Control.Concurrent
 import Control.Monad (forever)
 
@@ -37,14 +32,6 @@ getRawStreams handle = do
     inStream <- parserToInputStream zDumbParser inputStream
     outStream <- Streams.makeOutputStream $ \m -> case m of
             Just zmsg -> L.hPut handle $ encodeRawZMsg zmsg
-            Nothing -> return () -- could close the handle/socket?
-    return (inStream, outStream)
-
-getStreams handle = do
-    inputStream <- Streams.handleToInputStream handle
-    inStream <- parserToInputStream zMessageParser inputStream
-    outStream <- Streams.makeOutputStream $ \m -> case m of
-            Just zmsg -> L.hPut handle $ encode (ZMsgRaw 0 zmsg)
             Nothing -> return () -- could close the handle/socket?
     return (inStream, outStream)
 

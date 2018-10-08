@@ -17,8 +17,9 @@ import Data.Binary
 import ZServ
 
 main = do
-    verify "000701101f0001c0a82c010100000038000000000000000000"
-    verify "000701101f200102030401c0a87aec0100000003000000000000000000"
+    verify ZServer "000801100320a9fe000101c0a87a710100000004"
+    verify ZServer "000701101f0001c0a82c010100000038000000000000000000"
+    verify ZServer "000701101f200102030401c0a87aec0100000003000000000000000000"
     -- screenClear
     -- verify "00080909080001180c000100000000"
     -- verifyFlowFile "flow5"
@@ -46,25 +47,25 @@ main = do
     -- parseFlowFile "flow4"
     -- parseFlowFile "flow5"
 
-verify :: C8.ByteString -> IO ()
-verify c8 = verify' (fromHex c8)
+verify :: ZRole -> C8.ByteString -> IO ()
+verify role c8 = verify' role (fromHex c8)
 
-verify' :: BS.ByteString -> IO ()
-verify' bs =
+verify' :: ZRole -> BS.ByteString -> IO ()
+verify' role bs =
     either (\errString -> putStrLn $ "decode failed for string " ++ toHex bs ++ " (" ++ errString ++ ")")
            (\rightZMsg -> do let bs' = encode' rightZMsg
                              if bs == bs' then putStrLn $ "OK (" ++ toHex bs ++ " = " ++ show rightZMsg ++ ")"
                              else putStrLn $ "encode failed for string \n" ++ toHex bs ++ " /= \n" ++ toHex bs'  ++ " (" ++ show rightZMsg ++ ")")
-           ( zParser' bs )
+           ( zParser' role bs )
     where encode' = L.toStrict . encode
 
-verifyFlowFile path = do
+verifyFlowFile role path = do
     flow <- BS.readFile path
     either putStrLn
-           ( mapM_ ( \(_,pl) -> verify' pl) )
+           ( mapM_ ( \(_,pl) -> verify' role pl) )
            ( DAB.parseOnly zRawFlowParser flow )
 
-parseFlowFile path = do
+parseFlowFile role path = do
     flow <- BS.readFile path
     let zmsgs = DAB.parseOnly zFlowParser flow
     let raw = DAB.parseOnly zRawFlowParser flow
@@ -74,7 +75,7 @@ parseFlowFile path = do
            ( mapM_ ( \(cmd,pl) -> putStrLn $ "cmd " ++ show cmd ++ " len " ++ show (BS.length pl-2) ++ " : " ++ toHex pl ))
            raw
     let parsed = fmap (map eparse) raw
-        eparse = parse'' zParser . snd
+        eparse = parse'' (zParser role) . snd
 
     putStrLn "\neparsed"
     putStrLn $ either show
@@ -97,8 +98,8 @@ parse' p s = (C8.unpack s,DAB.parseOnly (p n) bs) where
     n  = BS.length bs
 
 -- zParse needs the length of the supplied byteString, zParse' wraps this away
-zParser' :: BS.ByteString -> Either String ZMsg
-zParser' bs = DAB.parseOnly (zParser (BS.length bs)) bs 
+zParser' :: ZRole -> BS.ByteString -> Either String ZMsg
+zParser' role bs = DAB.parseOnly (zParser role (BS.length bs)) bs 
 
 print' = putStrLn . show'
 show' :: (String, Either String ZMsg) -> String

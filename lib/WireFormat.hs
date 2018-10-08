@@ -14,7 +14,7 @@ import ZMsg
 import ZSpec
 
 zFlowParser :: Parser [ZMsg]
-zFlowParser = many1 zMessageParser'
+zFlowParser = many1 (zMessageParser' ZClient)
 
 
 zRawFlowParser :: Parser [(Word16,BS.ByteString)]
@@ -46,13 +46,13 @@ zDumbParser = do
     pl <- DAB.take (fromIntegral msgLen - 6)
     return (Just pl)
 
-zMessageParser :: Parser (Maybe ZMsg)
-zMessageParser = ( zMessageParser'' <|> return Nothing ) <?> "zserv wire format parser"
-zMessageParser'' = do
-    tmp <- zMessageParser'
+zMessageParser :: ZRole -> Parser (Maybe ZMsg)
+zMessageParser role = ( zMessageParser'' role <|> return Nothing ) <?> "zserv wire format parser"
+zMessageParser'' role = do
+    tmp <- zMessageParser' role
     return $ Just tmp
 
-zMessageParser' = do
+zMessageParser' role = do
     msgLen <- anyWord16be
     word8 0xff -- 'marker'
     word8 0x03 -- version - earlier than three has incompatible format - later is unknown
@@ -60,11 +60,11 @@ zMessageParser' = do
     when (msgLen > 4096 || msgLen < 8) ( fail "invalid message length")
     -- msg <- Data.Attoparsec.ByteString.take $ fromIntegral (msgLen - 6) 
     -- return $ Just msg
-    zParser $ fromIntegral (msgLen - 6)
+    zParser role $ fromIntegral (msgLen - 6)
 
 
-zParser :: Int -> Parser ZMsg
-zParser n' = do
+zParser :: ZRole -> Int -> Parser ZMsg
+zParser role n' = do
    let n = n'-2
    cmd' <- anyWord16be
    let cmd = cmd'
@@ -103,8 +103,10 @@ zParser n' = do
                  return $ ZMRouterIDUpdate prefix
 
       | cmd == _ZEBRA_IPV4_ROUTE_ADD ->
-          do route <- zRouteParser
-             return $ ZMIPV4RouteAdd route
+          case role of ZClient -> do route <- zRouteParser
+                                     return $ ZMIPV4RouteAdd route
+                       ZServer -> do route <- zServerRouteParser
+                                     return $ ZMIPV4ServerRouteAdd route
 
       | cmd == _ZEBRA_IPV4_ROUTE_DELETE ->
           do route <- zRouteParser
@@ -151,6 +153,7 @@ zRouteNextHopParser :: Parser ZNextHop
 zRouteNextHopParser = do
     _ <- anyWord8
     ipv4 <- zIPv4
+    word8 0x01
     w32 <- anyWord32be
     return $ ZNHIPv4Ifindex ipv4 w32
 
@@ -219,8 +222,8 @@ zIPv6Parser = do
 --            - BUT - it is not currently correct/consistent with zebra/zserv.c
 --            - the changes now being made
 
-zServRouteParser :: Parser ZServRoute
-zServRouteParser = do
+zServerRouteParser :: Parser ZServerRoute
+zServerRouteParser = do
     zrType <- anyWord8
     zrFlags <- anyWord8
     zrMsg <- anyWord8
@@ -233,7 +236,7 @@ zServRouteParser = do
     zrMetric <- if testBit zrMsg _ZAPI_MESSAGE_METRIC then fmap Just anyWord32be else return Nothing
     zrMtu <- if testBit zrMsg _ZAPI_MESSAGE_MTU then fmap Just anyWord32be else return Nothing
     zrTag <- if testBit zrMsg _ZAPI_MESSAGE_TAG then fmap Just anyWord32be else return Nothing
-    return ZServRoute{..}
+    return ZServerRoute{..}
 
 zRouteParser :: Parser ZRoute
 zRouteParser = do

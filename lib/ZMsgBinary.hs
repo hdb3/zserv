@@ -50,6 +50,8 @@ instance Binary ZMsg where
     put ( ZMInterfaceAddressDelete intAddr ) = put _ZEBRA_INTERFACE_ADDRESS_DELETE <> put intAddr
     put ( ZMIPV4RouteAdd route ) = put _ZEBRA_IPV4_ROUTE_ADD <> put route
     put ( ZMIPV4RouteDelete route ) = put _ZEBRA_IPV4_ROUTE_DELETE <> put route
+    put ( ZMIPV4ServerRouteAdd route ) = put _ZEBRA_IPV4_ROUTE_ADD <> put route
+    put ( ZMIPV4ServerRouteDelete route ) = put _ZEBRA_IPV4_ROUTE_DELETE <> put route
     put ( ZMRedistributeAdd routeType ) = put _ZEBRA_REDISTRIBUTE_ADD <> put routeType
     put ( ZMRedistributeDelete routeType ) = put _ZEBRA_REDISTRIBUTE_DELETE <> put routeType
     put ( ZMRedistributeDefaultAdd ) = put _ZEBRA_REDISTRIBUTE_DEFAULT_ADD
@@ -97,9 +99,9 @@ putzvPrefix ZPrefixV4{..} = do
        | plen < 33  -> put v4address
        | otherwise -> error $ "putzvPrefix: invalid plen - " ++ show plen
 
-putRoutePrefixV4 ZPrefixV6{..} = undefined -- TODO
-putRoutePrefixV4 pfx@ZPrefixV4{..} = putWord16be 0x01 <> -- 'SAFI' for IPv4!?
-                                 putzvPrefix pfx 
+-- putRoutePrefixV4 ZPrefixV6{..} = undefined -- TODO
+-- putRoutePrefixV4 pfx@ZPrefixV4{..} = putWord16be 0x01 <> -- 'SAFI' for IPv4!?
+--                                  putzvPrefix pfx 
 
 instance Binary ZInterfaceAddress where
     get = undefined
@@ -115,7 +117,7 @@ instance Binary ZNextHop where
     put ZNHBlackhole = put _ZEBRA_NEXTHOP_BLACKHOLE
     put ( ZNHIPv4 ip) = put _ZEBRA_NEXTHOP_IPV4 <> put ip
     put ( ZNHIfindex ifindex) = put _ZEBRA_NEXTHOP_IFINDEX <> put ifindex
-    put ( ZNHIPv4Ifindex ipv4 ifindex) = put _ZEBRA_NEXTHOP_IPV4_IFINDEX <> put ipv4 <> put ifindex
+    put ( ZNHIPv4Ifindex ipv4 ifindex) = put _ZEBRA_NEXTHOP_IPV4_IFINDEX <> put ipv4 <> putWord8 0x01 <> put ifindex
     --TODO .....
     put ( ZNHIPv6 _ ) = undefined
     put ( ZNHIPv6Ifindex _ _) = undefined
@@ -147,8 +149,32 @@ instance Binary ZRoute where
             zrMsg''    = zrMsg'     .|. if isJust zrMetric then bit _ZAPI_MESSAGE_METRIC else 0
             zrMsg'''   = zrMsg''    .|. if isJust zrMtu then bit _ZAPI_MESSAGE_MTU else 0
             zrMsg''''  = zrMsg'''   .|. if isJust zrTag then bit _ZAPI_MESSAGE_TAG else 0
-        put zrType <> put zrFlags <> put zrMsg'''' <> putRoutePrefixV4 zrPrefix
+        put zrType <> put zrFlags <> put zrMsg'''' <> putWord16be 0x01 <> putzvPrefix zrPrefix
+                                                      -- client side has to sent 'safi'
         unless (null zrNextHops) (put zrNextHops)
+        forM_ zrDistance put
+        forM_ zrMetric put
+        forM_ zrMtu put
+        forM_ zrTag put
+
+instance Binary ZServerRoute where
+    get = undefined
+    put ZServerRoute{..} =
+        do
+        let zrMsg      = if null zrNextHops then 0 else bit _ZAPI_MESSAGE_NEXTHOP .|. bit _ZAPI_MESSAGE_IFINDEX :: Word8
+            zrMsg'     = zrMsg      .|. if isJust zrDistance then bit _ZAPI_MESSAGE_DISTANCE else 0
+            zrMsg''    = zrMsg'     .|. if isJust zrMetric then bit _ZAPI_MESSAGE_METRIC else 0
+            zrMsg'''   = zrMsg''    .|. if isJust zrMtu then bit _ZAPI_MESSAGE_MTU else 0
+            zrMsg''''  = zrMsg'''   .|. if isJust zrTag then bit _ZAPI_MESSAGE_TAG else 0
+            -- this is an ugly hack but then so is zserv.c: the documentation is entirely obscure
+            -- my interprettaion is that the format for multiple hops is (1byte hop count) followed by (n x (ipv4, 0x01,ifindex) in the case of ipv4+ifindex
+            -- a cleaner read would allow alternative nexthop formats, which would be flagged by the API_MESSAGE_NEXTHOP / ZAPI_MESSAGE_IFINDEX flag bits
+            putServerNextHop ( ZNHIPv4Ifindex ipv4 ifindex) = put ipv4 <> putWord8 0x01 <> put ifindex
+            putServerNextHops hops = putWord8 (fromIntegral $ length hops) <> mapM_ putServerNextHop hops
+
+        put zrType <> put zrFlags <> put zrMsg'''' <> putzvPrefix zrPrefix
+                                                      -- server side has not to sent 'safi'
+        unless (null zrNextHops) (putServerNextHops zrNextHops)
         forM_ zrDistance put
         forM_ zrMetric put
         forM_ zrMtu put

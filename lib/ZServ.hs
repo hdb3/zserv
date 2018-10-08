@@ -17,16 +17,18 @@ import Data.IP
 import System.IO.Streams.Attoparsec.ByteString
 import Data.Binary
 
-getZStreamInet address = getZStream ( SockAddrInet 2600 (toHostAddress address), AF_INET )
-getZStreamUnix path = getZStream ( SockAddrUnix path , AF_UNIX )
+getZStreamInet address = getZStream ZClient ( SockAddrInet 2600 (toHostAddress address), AF_INET )
+getZStreamUnix path = getZStream ZClient ( SockAddrUnix path , AF_UNIX )
+getZServerStreamInet address = getZStream ZServer ( SockAddrInet 2600 (toHostAddress address), AF_INET )
+getZServerStreamUnix path = getZStream ZServer ( SockAddrUnix path , AF_UNIX )
 
-getZStream (address,family) = do
+getZStream role (address,family) = do
     sock <- socket family Stream defaultProtocol
     connect sock address
     putStrLn "connected"
     handle <- socketToHandle sock ReadWriteMode
     inputStream <- Streams.handleToInputStream handle
-    zStream <- parserToInputStream zMessageParser inputStream
+    zStream <- parserToInputStream (zMessageParser role) inputStream
     outputStream <- Streams.makeOutputStream $ \m -> case m of
             Just zmsg -> L.hPut handle $ encode (ZMsgRaw 0 zmsg)
             Nothing -> return () -- could close the handle/socket?
