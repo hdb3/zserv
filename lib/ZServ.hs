@@ -34,6 +34,7 @@ getZStream role (address,family) = do
             Nothing -> return () -- could close the handle/socket?
     return (zStream,outputStream)
 
+toIPv4Range ZPrefixV4{..} = makeAddrRange v4address (fromIntegral plen) 
 
 fromIPv4Range ipv4range = let (v4address, plen') = addrRangePair ipv4range 
                               plen = fromIntegral plen' in ZPrefixV4{..}
@@ -67,6 +68,17 @@ zservRequestRedistributeAll stream = zservRequestRedistributeSystem stream
                                    >> zservRequestRedistributeConnected stream
                                    >> zservRequestRedistributeStatic stream
 
+
+getZRoute :: ZMsg -> Maybe (AddrRange IPv4 , Maybe IPv4)
+getZRoute (ZMIPV4ServerRouteAdd ZServerRoute{..}) = Just (toIPv4Range zrPrefix, nextHop zrNextHops) where
+    nextHop ((ZNHIPv4Ifindex ip _):_) = Just ip
+    nextHop ([]) = Nothing
+
+getZRoute (ZMIPV4ServerRouteDelete ZServerRoute{..}) = Just (toIPv4Range zrPrefix, Nothing) where
+
+getZRoute (ZMInterfaceAddressAdd ZInterfaceAddressV4{..}) = Just ( makeAddrRange addressA (fromIntegral plen), Just "127.0.0.1")
+ 
+getZRoute _ = Nothing
 
 zservReadLoop stream = do
     msg <- Streams.read stream
