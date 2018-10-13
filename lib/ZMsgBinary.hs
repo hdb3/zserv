@@ -55,7 +55,7 @@ instance Binary ZMsg where
     put ( ZMRedistributeAdd routeType ) = put _ZEBRA_REDISTRIBUTE_ADD <> put routeType
     put ( ZMRedistributeDelete routeType ) = put _ZEBRA_REDISTRIBUTE_DELETE <> put routeType
     put ( ZMRedistributeDefaultAdd ) = put _ZEBRA_REDISTRIBUTE_DEFAULT_ADD
-    put ( _ZEBRA_REDISTRIBUTE_DEFAULT_DELETE ) = put _ZEBRA_REDISTRIBUTE_DEFAULT_ADD
+    put ( ZMRedistributeDefaultDelete ) = put _ZEBRA_REDISTRIBUTE_DEFAULT_DELETE
     put ( ZMNextHopUpdate update ) = put _ZEBRA_NEXTHOP_UPDATE <> put update
     put ( ZMUnknown cmd (HexByteString bs) ) = put cmd <> putByteString bs
     -- put z = error $ "put ZMsg failed for ZMsg: " ++ show z 
